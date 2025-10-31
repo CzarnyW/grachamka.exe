@@ -1,0 +1,41 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\SzymonOlszewski\\source\\grachamka.exe\\Grachamka\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{B378F65B-18B1-4971-9097-65CEC3CB830A}|Grachamka\\Grachamka.vcxproj|C:\\Users\\SzymonOlszewski\\source\\grachamka.exe\\Grachamka\\Grachamka\\Grachamka.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{B378F65B-18B1-4971-9097-65CEC3CB830A}|Grachamka\\Grachamka.vcxproj|solutionrelative:Grachamka\\Grachamka.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 0,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "Grachamka.cpp",
+              "DocumentMoniker": "C:\\Users\\SzymonOlszewski\\source\\grachamka.exe\\Grachamka\\Grachamka\\Grachamka.cpp",
+              "RelativeDocumentMoniker": "Grachamka\\Grachamka.cpp",
+              "ToolTip": "C:\\Users\\SzymonOlszewski\\source\\grachamka.exe\\Grachamka\\Grachamka\\Grachamka.cpp",
+              "RelativeToolTip": "Grachamka\\Grachamka.cpp",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
+              "WhenOpened": "2025-10-31T10:15:39.761Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{cce594b6-0c39-4442-ba28-10c64ac7e89f}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
