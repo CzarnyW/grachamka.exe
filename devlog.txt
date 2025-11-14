@@ -1,1 +1,2 @@
-# grachamka.exe
+1. wspólna praca nad kodem bazowym gry
+14.11.2025 - próba zrobienia efetywego systemu zapisu i wczytywania gry, dodanie nowych opcji.
