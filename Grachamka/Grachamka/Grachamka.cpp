@@ -9,6 +9,8 @@
 #include <limits>
 #include <chrono>
 #include <thread>
+#include <fstream>
+#include <sstream>
 
 using namespace std;
 
@@ -25,6 +27,17 @@ struct Equipment {
     int price;
     int levelReq;
     string type;
+};
+
+struct Enemy {
+    string name;
+    int hp;
+    int maxHp;
+    int damage;
+    int defense;
+    int exp;
+    int gold;
+    int level;
 };
 
 struct Player {
@@ -44,17 +57,35 @@ struct Player {
     int skillPoints;
     int wins;
     int losses;
+    int saveSlot;
 };
 
-struct Enemy {
-    string name;
-    int hp;
-    int maxHp;
-    int damage;
-    int defense;
-    int exp;
-    int gold;
+struct SaveFile {
+    string playerName;
     int level;
+    int exp;
+    int expToNext;
+    int gold;
+    int strength, agility, vitality, magic;
+    int maxHp;
+    int currentHp;
+    int energy;
+    int maxEnergy;
+    string weaponName;
+    int weaponValue;
+    int weaponPrice;
+    int weaponLevelReq;
+    string armorName;
+    int armorValue;
+    int armorPrice;
+    int armorLevelReq;
+    string accessoryName;
+    int accessoryValue;
+    int accessoryPrice;
+    int accessoryLevelReq;
+    int skillPoints;
+    int wins;
+    int losses;
 };
 
 void clearScreen() {
@@ -82,6 +113,8 @@ void displayPlayerStats(const Player& player) {
     cout << "! " << setw(15) << left << player.name
         << " ! Poziom: " << setw(2) << player.level
         << " ! Zloto: " << setw(6) << player.gold << " !\n";
+    cout << "! Gniazdo zapisu: " << player.saveSlot << "     "
+        << "              !\n";
     cout << "-----------------------------------------------\n";
     cout << "! HP: " << setw(4) << player.currentHp << "/" << setw(4) << player.maxHp
         << " ! Energia: " << setw(3) << player.energy << "/" << setw(3) << player.maxEnergy << "     !\n";
@@ -107,6 +140,222 @@ void displayEquipment(const Player& player) {
     cout << "! Akcesoria: " << setw(25) << left
         << (player.accessory ? player.accessory->name : "Brak") << "!\n";
     cout << "-------------------------------------------\n";
+}
+
+string getSaveFileName(int slot) {
+    return "save_" + to_string(slot) + ".txt";
+}
+
+bool saveGameExists(int slot) {
+    ifstream file(getSaveFileName(slot));
+    return file.good();
+}
+
+void saveGame(const Player& player, const vector<Equipment>& inventory) {
+    string filename = getSaveFileName(player.saveSlot);
+    ofstream file(filename);
+
+    if (!file.is_open()) {
+        cout << "Blad: Nie mozna utworzyc pliku zapisu!\n";
+        return;
+    }
+
+    file << player.name << "\n";
+    file << player.level << "\n";
+    file << player.exp << "\n";
+    file << player.expToNext << "\n";
+    file << player.gold << "\n";
+    file << player.stats.strength << "\n";
+    file << player.stats.agility << "\n";
+    file << player.stats.vitality << "\n";
+    file << player.stats.magic << "\n";
+    file << player.maxHp << "\n";
+    file << player.currentHp << "\n";
+    file << player.energy << "\n";
+    file << player.maxEnergy << "\n";
+
+    if (player.weapon) {
+        file << player.weapon->name << "\n";
+        file << player.weapon->value << "\n";
+        file << player.weapon->price << "\n";
+        file << player.weapon->levelReq << "\n";
+    }
+    else {
+        file << "BRAK\n0\n0\n0\n";
+    }
+
+    if (player.armor) {
+        file << player.armor->name << "\n";
+        file << player.armor->value << "\n";
+        file << player.armor->price << "\n";
+        file << player.armor->levelReq << "\n";
+    }
+    else {
+        file << "BRAK\n0\n0\n0\n";
+    }
+
+    if (player.accessory) {
+        file << player.accessory->name << "\n";
+        file << player.accessory->value << "\n";
+        file << player.accessory->price << "\n";
+        file << player.accessory->levelReq << "\n";
+    }
+    else {
+        file << "BRAK\n0\n0\n0\n";
+    }
+
+    file << player.skillPoints << "\n";
+    file << player.wins << "\n";
+    file << player.losses << "\n";
+
+    file.close();
+    cout << "\nGra zapisana w gniazdu " << player.saveSlot << "!\n";
+}
+
+bool loadGame(Player& player) {
+    string filename = getSaveFileName(player.saveSlot);
+    ifstream file(filename);
+
+    if (!file.is_open()) {
+        return false;
+    }
+
+    SaveFile save;
+    getline(file, save.playerName);
+    file >> save.level >> save.exp >> save.expToNext >> save.gold;
+    file >> save.strength >> save.agility >> save.vitality >> save.magic;
+    file >> save.maxHp >> save.currentHp >> save.energy >> save.maxEnergy;
+
+    file.ignore();
+    getline(file, save.weaponName);
+    file >> save.weaponValue >> save.weaponPrice >> save.weaponLevelReq;
+
+    file.ignore();
+    getline(file, save.armorName);
+    file >> save.armorValue >> save.armorPrice >> save.armorLevelReq;
+
+    file.ignore();
+    getline(file, save.accessoryName);
+    file >> save.accessoryValue >> save.accessoryPrice >> save.accessoryLevelReq;
+
+    file >> save.skillPoints >> save.wins >> save.losses;
+
+    file.close();
+
+    player.name = save.playerName;
+    player.level = save.level;
+    player.exp = save.exp;
+    player.expToNext = save.expToNext;
+    player.gold = save.gold;
+    player.stats.strength = save.strength;
+    player.stats.agility = save.agility;
+    player.stats.vitality = save.vitality;
+    player.stats.magic = save.magic;
+    player.maxHp = save.maxHp;
+    player.currentHp = save.currentHp;
+    player.energy = save.energy;
+    player.maxEnergy = save.maxEnergy;
+    player.skillPoints = save.skillPoints;
+    player.wins = save.wins;
+    player.losses = save.losses;
+
+    if (save.weaponName != "BRAK") {
+        Equipment* weapon = new Equipment();
+        weapon->name = save.weaponName;
+        weapon->value = save.weaponValue;
+        weapon->price = save.weaponPrice;
+        weapon->levelReq = save.weaponLevelReq;
+        weapon->type = "weapon";
+        player.weapon = weapon;
+    }
+
+    if (save.armorName != "BRAK") {
+        Equipment* armor = new Equipment();
+        armor->name = save.armorName;
+        armor->value = save.armorValue;
+        armor->price = save.armorPrice;
+        armor->levelReq = save.armorLevelReq;
+        armor->type = "armor";
+        player.armor = armor;
+    }
+
+    if (save.accessoryName != "BRAK") {
+        Equipment* accessory = new Equipment();
+        accessory->name = save.accessoryName;
+        accessory->value = save.accessoryValue;
+        accessory->price = save.accessoryPrice;
+        accessory->levelReq = save.accessoryLevelReq;
+        accessory->type = "accessory";
+        player.accessory = accessory;
+    }
+
+    return true;
+}
+
+void deleteSave(int slot) {
+    string filename = getSaveFileName(slot);
+    if (remove(filename.c_str()) == 0) {
+        cout << "\nZapis z gniazda " << slot << " zostal usuniety!\n";
+    }
+    else {
+        cout << "\nBlad: Nie mozna usunac zapisu!\n";
+    }
+}
+
+void manageSaves() {
+    while (true) {
+        clearScreen();
+        displayHeader("ZARZADZANIE ZAPISAMI");
+
+        cout << "\nDostepne gniazda zapisu:\n\n";
+        for (int i = 1; i <= 3; i++) {
+            if (saveGameExists(i)) {
+                cout << i << ". [ZAJETNE] ";
+                ifstream file(getSaveFileName(i));
+                string playerName;
+                int level;
+                getline(file, playerName);
+                file >> level;
+                file.close();
+                cout << playerName << " - Poziom " << level << "\n";
+            }
+            else {
+                cout << i << ". [PUSTE]\n";
+            }
+        }
+
+        cout << "\n1. Usun zapis z gniazda 1\n";
+        cout << "2. Usun zapis z gniazda 2\n";
+        cout << "3. Usun zapis z gniazda 3\n";
+        cout << "4. Powrot\n\n";
+        cout << "Wybor: ";
+
+        int choice;
+        cin >> choice;
+
+        if (choice >= 1 && choice <= 3) {
+            if (saveGameExists(choice)) {
+                cout << "\nCzy na pewno chcesz usunac zapis? (T/N): ";
+                char confirm;
+                cin >> confirm;
+                if (confirm == 'T' || confirm == 't') {
+                    deleteSave(choice);
+                    pause();
+                }
+            }
+            else {
+                cout << "\nGniazdo zapisu jest puste!\n";
+                pause();
+            }
+        }
+        else if (choice == 4) {
+            return;
+        }
+        else {
+            cout << "\nZly wybor!\n";
+            pause();
+        }
+    }
 }
 
 int calculateMaxHp(const Player& player) {
@@ -781,6 +1030,7 @@ int main() {
     player.skillPoints = 0;
     player.wins = 0;
     player.losses = 0;
+    player.saveSlot = 1;
 
     vector<Equipment> inventory;
 
@@ -796,8 +1046,85 @@ int main() {
     cout << "    !                                               !\n";
     cout << "    -------------------------------------------------\n\n";
 
-    cout << "Podaj imie swojego gladiatora: ";
-    getline(cin, player.name);
+    cout << "1. Nowa gra\n";
+    cout << "2. Wczytaj gre\n\n";
+    cout << "Wybor: ";
+
+    int startChoice;
+    cin >> startChoice;
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+
+    if (startChoice == 2) {
+        clearScreen();
+        cout << "\n--- WCZYTAJ GRE ---\n\n";
+        for (int i = 1; i <= 3; i++) {
+            if (saveGameExists(i)) {
+                cout << i << ". [ZAJETNE] ";
+                ifstream file(getSaveFileName(i));
+                string playerName;
+                int level;
+                getline(file, playerName);
+                file >> level;
+                file.close();
+                cout << playerName << " - Poziom " << level << "\n";
+            }
+            else {
+                cout << i << ". [PUSTE]\n";
+            }
+        }
+        cout << "\nWybor gniazda: ";
+
+        int slotChoice;
+        cin >> slotChoice;
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+
+        if (slotChoice >= 1 && slotChoice <= 3) {
+            player.saveSlot = slotChoice;
+            if (loadGame(player)) {
+                cout << "\nGra wczytana!\n";
+                pause();
+            }
+            else {
+                cout << "\nBlad: Nie mozna wczytac gry!\n";
+                pause();
+                return 1;
+            }
+        }
+        else {
+            cout << "\nZly wybor!\n";
+            return 1;
+        }
+    }
+    else {
+        clearScreen();
+        cout << "\n--- NOWA GRA ---\n\n";
+        cout << "Wybierz gniazdo zapisu (1, 2 lub 3): ";
+        int slotChoice;
+        cin >> slotChoice;
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+
+        if (slotChoice >= 1 && slotChoice <= 3) {
+            player.saveSlot = slotChoice;
+
+            if (saveGameExists(slotChoice)) {
+                cout << "\nGniazdo zawiera juz zapis! Czy chcesz go nadpisac? (T/N): ";
+                char confirm;
+                cin >> confirm;
+                cin.ignore(numeric_limits<streamsize>::max(), '\n');
+                if (confirm != 'T' && confirm != 't') {
+                    cout << "Anulowano.\n";
+                    return 1;
+                }
+            }
+
+            cout << "Podaj imie swojego gladiatora: ";
+            getline(cin, player.name);
+        }
+        else {
+            cout << "Zly wybor!\n";
+            return 1;
+        }
+    }
 
     while (true) {
         clearScreen();
@@ -810,7 +1137,9 @@ int main() {
         cout << "3. Sklep\n";
         cout << "4. Ulepszenia Statystyk\n";
         cout << "5. Odpoczynek (Przywroc HP i energie)\n";
-        cout << "6. Zakoncz gre\n\n";
+        cout << "6. Zapisz gre\n";
+        cout << "7. Zarzadzaj zapisami\n";
+        cout << "8. Zakonczy gre\n\n";
         cout << "Wybor: ";
 
         int choice;
@@ -843,6 +1172,13 @@ int main() {
             pause();
             break;
         case 6:
+            saveGame(player, inventory);
+            pause();
+            break;
+        case 7:
+            manageSaves();
+            break;
+        case 8:
             clearScreen();
             cout << "\n\n=== STATYSTYKI KONCOWE ===\n\n";
             displayPlayerStats(player);
