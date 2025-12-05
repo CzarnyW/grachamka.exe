@@ -1457,8 +1457,9 @@ int main() {
             if (gameState == TITLE_SCREEN) {
                 startButton.isHovered = isMouseOverButton(startButton, mouseX, mouseY);
             }
-    }
+        }
 
+    }
     al_register_event_source(event_queue, al_get_display_event_source(display));
     al_register_event_source(event_queue, al_get_timer_event_source(timer));
     al_register_event_source(event_queue, al_get_keyboard_event_source());
