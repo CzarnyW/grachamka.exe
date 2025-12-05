@@ -16,11 +16,14 @@
 #include <allegro5/allegro_font.h>  
 #include <allegro5/allegro_ttf.h>  
 #include <allegro5/allegro_image.h>
+#include <atomic>
 
 using namespace std;
 
 const int SCREEN_W = 1500;
 const int SCREEN_H = 1000;
+
+atomic<bool> allegro_running(true);
 
 enum GameState {
     TITLE_SCREEN,
@@ -36,7 +39,7 @@ enum GameState {
     ARENA,
     STATYSTYKI,
     ZARZAD,
-
+    NOWA_GRA,
 };
 
 struct Stats {
@@ -120,6 +123,25 @@ struct SaveFile {
     int wins;
     int losses;
     int arenaLevel;
+};
+
+struct Button {
+    float x, y;
+    float width, height;
+    const char* text;
+    ALLEGRO_COLOR color;
+    ALLEGRO_COLOR textColor;
+    ALLEGRO_COLOR hoverColor;
+    bool isHovered;
+};
+
+struct Explosion {
+    float x, y;
+    float radius;
+    int lifetime;
+    int currentFrame;
+    ALLEGRO_COLOR color;
+    bool active;
 };
 
 void clearScreen() {
@@ -238,6 +260,7 @@ void saveGame(const Player& player) {
     file.close();
     cout << "\nGra zapisana w gniazdu " << player.saveSlot << "!\n";
 }
+
 
 bool loadGame(Player& player) {
     string filename = getSaveFileName(player.saveSlot);
@@ -377,6 +400,43 @@ void manageSaves() {
             pause();
         }
     }
+}
+
+Button createButton(float x, float y, float width, float height, const char* text,
+    ALLEGRO_COLOR color, ALLEGRO_COLOR textColor, ALLEGRO_COLOR hoverColor) {
+    Button btn;
+    btn.x = x;
+    btn.y = y;
+    btn.width = width;
+    btn.height = height;
+    btn.text = text;
+    btn.color = color;
+    btn.textColor = textColor;
+    btn.hoverColor = hoverColor;
+    btn.isHovered = false;
+    return btn;
+}
+
+bool isMouseOverButton(const Button& btn, int mouseX, int mouseY) {
+    return mouseX >= btn.x && mouseX <= btn.x + btn.width &&
+        mouseY >= btn.y && mouseY <= btn.y + btn.height;
+}
+
+void drawButton(const Button& btn, ALLEGRO_FONT* font) {
+    ALLEGRO_COLOR currentColor = btn.isHovered ? btn.hoverColor : btn.color;
+    al_draw_filled_rectangle(btn.x, btn.y, btn.x + btn.width, btn.y + btn.height, currentColor);
+    al_draw_rectangle(btn.x, btn.y, btn.x + btn.width, btn.y + btn.height, al_map_rgb(255, 255, 255), 2);
+    int textWidth = al_get_text_width(font, btn.text);
+    int textHeight = al_get_font_line_height(font);
+    float textX = btn.x + (btn.width - textWidth) / 2;
+    float textY = btn.y + (btn.height - textHeight) / 2;
+    al_draw_text(font, btn.textColor, textX, textY, 0, btn.text);
+}
+
+void drawTitleScreen(ALLEGRO_FONT* titleFont, ALLEGRO_FONT* buttonFont, Button& startButton) {
+    al_clear_to_color(al_map_rgb(20, 30, 50));
+    al_draw_text(titleFont, al_map_rgb(255, 215, 0), SCREEN_W / 2, SCREEN_H / 4, ALLEGRO_ALIGN_CENTRE, "MISTRZOWIE OSTRZA");
+    drawButton(startButton, buttonFont);
 }
 
 int calculateMaxHp(const Player& player) {
@@ -1288,11 +1348,123 @@ void upgradeStats(Player& player) {
     }
 }
 
+
+
+
 int main() {
-    ALLEGRO_DISPLAY* display = al_create_display(SCREEN_W, SCREEN_H);
-    ALLEGRO_TIMER* timer = al_create_timer(1.0 / 60.0);
+    al_install_keyboard();
+    al_install_mouse();
+    al_init_primitives_addon();
+    al_init_font_addon();
+    al_init_ttf_addon();
+    al_init_image_addon();
+    srand(time(NULL));
+
+    ALLEGRO_DISPLAY* display = NULL;
+    ALLEGRO_EVENT_QUEUE* event_queue = NULL;
     ALLEGRO_EVENT_QUEUE* queue = al_create_event_queue();
-    srand(static_cast<unsigned>(time(0)));
+    ALLEGRO_TIMER* timer = al_create_timer(1.0 / 60);
+    ALLEGRO_FONT* font = al_load_ttf_font("arial.ttf", 24, 0);
+    ALLEGRO_FONT* victoryFont = al_load_ttf_font("arial.ttf", 48, 0);
+    ALLEGRO_FONT* titleFont = al_load_ttf_font("arial.ttf", 72, 0);
+
+    if (!al_init()) {
+        fprintf(stderr, "Nie udało się zainicjalizować Allegro!\n");
+        return -1;
+    }
+
+    if (!al_init_primitives_addon()) {
+        fprintf(stderr, "Nie udało się zainicjalizować primitives addon!\n");
+        return -1;
+    }
+
+    if (!al_install_keyboard()) {
+        fprintf(stderr, "Nie udało się zainicjalizować klawiatury!\n");
+        return -1;
+    }
+
+    if (!al_install_mouse()) {
+        fprintf(stderr, "Nie udało się zainicjalizować myszy!\n");
+        return -1;
+    }
+
+    timer = al_create_timer(1.0 / 60.0);
+    if (!timer) {
+        fprintf(stderr, "Nie udało się utworzyć timera!\n");
+        return -1;
+    }
+
+    display = al_create_display(SCREEN_W, SCREEN_H);
+    if (!display) {
+        fprintf(stderr, "Nie udało się utworzyć okna!\n");
+        al_destroy_timer(timer);
+        return -1;
+    }
+    al_set_window_title(display, "Mistrzowie Ostrzy");
+
+
+
+    if (!font || !victoryFont || !titleFont) {
+        font = al_create_builtin_font();
+        victoryFont = al_create_builtin_font();
+        titleFont = al_create_builtin_font();
+    }
+
+    al_register_event_source(queue, al_get_keyboard_event_source());
+    al_register_event_source(queue, al_get_mouse_event_source());
+    al_register_event_source(queue, al_get_display_event_source(display));
+    al_register_event_source(queue, al_get_timer_event_source(timer));
+
+    Button startButton = createButton(
+        SCREEN_W / 2 - 100, SCREEN_H * 3 / 4,
+        200, 60,
+        "START GRY",
+        al_map_rgb(50, 120, 50),
+        al_map_rgb(255, 255, 255),
+        al_map_rgb(70, 160, 70)
+    );
+
+    bool running = true;
+    bool redraw = true;
+    bool key_left = false, key_right = false, key_up = false, key_down = false;
+    int roundWinner = 0;
+    GameState gameState = TITLE_SCREEN;
+    int mouseX = 0, mouseY = 0;
+    event_queue = al_create_event_queue();
+
+    ALLEGRO_EVENT event;
+    al_start_timer(timer);
+
+    if (!event_queue) {
+        fprintf(stderr, "Nie udało się utworzyć kolejki zdarzeń!\n");
+        al_destroy_display(display);
+        al_destroy_timer(timer);
+        return -1;
+    }
+
+    while (running) {
+        al_wait_for_event(queue, &event);
+
+        if (event.type == ALLEGRO_EVENT_DISPLAY_CLOSE ||
+            (event.type == ALLEGRO_EVENT_KEY_DOWN && event.keyboard.keycode == ALLEGRO_KEY_ESCAPE)) {
+            running = false;
+        }
+        else if (event.type == ALLEGRO_EVENT_MOUSE_AXES) {
+            mouseX = event.mouse.x;
+            mouseY = event.mouse.y;
+
+
+            if (gameState == TITLE_SCREEN) {
+                startButton.isHovered = isMouseOverButton(startButton, mouseX, mouseY);
+            }
+    }
+
+    al_register_event_source(event_queue, al_get_display_event_source(display));
+    al_register_event_source(event_queue, al_get_timer_event_source(timer));
+    al_register_event_source(event_queue, al_get_keyboard_event_source());
+    al_register_event_source(event_queue, al_get_mouse_event_source());
+
+
 
     Player player;
     player.name = "Gladiator";
@@ -1369,11 +1541,21 @@ int main() {
             else {
                 cout << "\nBlad: Nie mozna wczytac gry!\n";
                 pause();
+                allegro_running = false;
+                this_thread::sleep_for(chrono::milliseconds(100));
+                al_destroy_event_queue(event_queue);
+                al_destroy_timer(timer);
+                al_destroy_display(display);
                 return 1;
             }
         }
         else {
             cout << "\nZly wybor!\n";
+            allegro_running = false;
+            this_thread::sleep_for(chrono::milliseconds(100));
+            al_destroy_event_queue(event_queue);
+            al_destroy_timer(timer);
+            al_destroy_display(display);
             return 1;
         }
     }
@@ -1397,6 +1579,11 @@ int main() {
 
                 if (confirm != 'T' && confirm != 't') {
                     cout << "Anulowano.\n";
+                    allegro_running = false;
+                    this_thread::sleep_for(chrono::milliseconds(100));
+                    al_destroy_event_queue(event_queue);
+                    al_destroy_timer(timer);
+                    al_destroy_display(display);
                     return 1;
                 }
             }
@@ -1406,11 +1593,16 @@ int main() {
         }
         else {
             cout << "Zly wybor!\n";
+            allegro_running = false;
+            this_thread::sleep_for(chrono::milliseconds(100));
+            al_destroy_event_queue(event_queue);
+            al_destroy_timer(timer);
+            al_destroy_display(display);
             return 1;
         }
     }
 
-    while (true) {
+    while (allegro_running) {
         clearScreen();
         displayHeader("MENU GLOWNE");
         displayPlayerStats(player);
@@ -1461,14 +1653,20 @@ int main() {
             cout << "\n\n=== STATYSTYKI KONCOWE ===\n\n";
             displayPlayerStats(player);
             cout << "\nDziekujemy za gre!\n\n";
-            return 0;
+            allegro_running = false;
+            break;
         default:
             cout << "\nZly wybor!\n";
             pause();
         }
     }
-    al_destroy_event_queue(queue);
+
+    // Cleanup
+    allegro_running = false;
+    this_thread::sleep_for(chrono::milliseconds(100)); // Poczekaj na zakończenie wątku
+    al_destroy_event_queue(event_queue);
     al_destroy_timer(timer);
     al_destroy_display(display);
+
     return 0;
 }
