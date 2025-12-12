@@ -1,3 +1,4 @@
+#define _CRT_SECURE_NO_WARNINGS
 #include <iostream>
 #include <string>
 #include <vector>
@@ -1291,6 +1292,8 @@ void shop(Player& player) {
     }
 }
 
+
+
 void upgradeStats(Player& player) {
     while (player.skillPoints > 0) {
         clearScreen();
@@ -1351,63 +1354,56 @@ void upgradeStats(Player& player) {
 
 
 
+void drawPlayer(float x, float y, float size) {
+    al_draw_filled_rectangle(x, y, x + size, y + size, al_map_rgb(50, 200, 50));
+    al_draw_rectangle(x, y, x + size, y + size, al_map_rgb(255, 255, 255), 2);
+}
+
+void drawEnemy(float x, float y, float size) {
+    al_draw_filled_rectangle(x, y, x + size, y + size, al_map_rgb(200, 50, 50));
+    al_draw_rectangle(x, y, x + size, y + size, al_map_rgb(255, 255, 255), 2);
+}
+
+void drawHealthBar(float x, float y, float width, float height, int current, int max, ALLEGRO_COLOR color) {
+    al_draw_filled_rectangle(x, y, x + width, y + height, al_map_rgb(50, 50, 50));
+    float fillWidth = (width * current) / max;
+    al_draw_filled_rectangle(x, y, x + fillWidth, y + height, color);
+    al_draw_rectangle(x, y, x + width, y + height, al_map_rgb(255, 255, 255), 2);
+}
+
 int main() {
+    srand(static_cast<unsigned int>(time(0)));
+
+    if (!al_init()) {
+        cerr << "Blad inicjalizacji Allegro!" << endl;
+        return -1;
+    }
+
     al_install_keyboard();
     al_install_mouse();
     al_init_primitives_addon();
     al_init_font_addon();
     al_init_ttf_addon();
-    al_init_image_addon();
-    srand(time(NULL));
 
-    ALLEGRO_DISPLAY* display = NULL;
-    ALLEGRO_EVENT_QUEUE* event_queue = NULL;
+    ALLEGRO_DISPLAY* display = al_create_display(SCREEN_W, SCREEN_H);
+    if (!display) {
+        cerr << "Blad tworzenia okna!" << endl;
+        return -1;
+    }
+
+    al_set_window_title(display, "Mistrzowie Ostrza");
+
     ALLEGRO_EVENT_QUEUE* queue = al_create_event_queue();
     ALLEGRO_TIMER* timer = al_create_timer(1.0 / 60);
-    ALLEGRO_FONT* font = al_load_ttf_font("arial.ttf", 24, 0);
-    ALLEGRO_FONT* victoryFont = al_load_ttf_font("arial.ttf", 48, 0);
-    ALLEGRO_FONT* titleFont = al_load_ttf_font("arial.ttf", 72, 0);
 
-    if (!al_init()) {
-        fprintf(stderr, "Nie udało się zainicjalizować Allegro!\n");
-        return -1;
-    }
+    ALLEGRO_FONT* font = al_load_ttf_font("arial.ttf", 20, 0);
+    ALLEGRO_FONT* titleFont = al_load_ttf_font("arial.ttf", 48, 0);
+    ALLEGRO_FONT* smallFont = al_load_ttf_font("arial.ttf", 16, 0);
 
-    if (!al_init_primitives_addon()) {
-        fprintf(stderr, "Nie udało się zainicjalizować primitives addon!\n");
-        return -1;
-    }
-
-    if (!al_install_keyboard()) {
-        fprintf(stderr, "Nie udało się zainicjalizować klawiatury!\n");
-        return -1;
-    }
-
-    if (!al_install_mouse()) {
-        fprintf(stderr, "Nie udało się zainicjalizować myszy!\n");
-        return -1;
-    }
-
-    timer = al_create_timer(1.0 / 60.0);
-    if (!timer) {
-        fprintf(stderr, "Nie udało się utworzyć timera!\n");
-        return -1;
-    }
-
-    display = al_create_display(SCREEN_W, SCREEN_H);
-    if (!display) {
-        fprintf(stderr, "Nie udało się utworzyć okna!\n");
-        al_destroy_timer(timer);
-        return -1;
-    }
-    al_set_window_title(display, "Mistrzowie Ostrzy");
-
-
-
-    if (!font || !victoryFont || !titleFont) {
+    if (!font || !titleFont || !smallFont) {
         font = al_create_builtin_font();
-        victoryFont = al_create_builtin_font();
         titleFont = al_create_builtin_font();
+        smallFont = al_create_builtin_font();
     }
 
     al_register_event_source(queue, al_get_keyboard_event_source());
@@ -1415,258 +1411,544 @@ int main() {
     al_register_event_source(queue, al_get_display_event_source(display));
     al_register_event_source(queue, al_get_timer_event_source(timer));
 
-    Button startButton = createButton(
-        SCREEN_W / 2 - 100, SCREEN_H * 3 / 4,
-        200, 60,
-        "START GRY",
-        al_map_rgb(50, 120, 50),
-        al_map_rgb(255, 255, 255),
-        al_map_rgb(70, 160, 70)
-    );
-
-    bool running = true;
-    bool redraw = true;
-    bool key_left = false, key_right = false, key_up = false, key_down = false;
-    int roundWinner = 0;
-    GameState gameState = TITLE_SCREEN;
-    int mouseX = 0, mouseY = 0;
-    event_queue = al_create_event_queue();
-
-    ALLEGRO_EVENT event;
-    al_start_timer(timer);
-
-    if (!event_queue) {
-        fprintf(stderr, "Nie udało się utworzyć kolejki zdarzeń!\n");
-        al_destroy_display(display);
-        al_destroy_timer(timer);
-        return -1;
-    }
-
-    while (running) {
-        al_wait_for_event(queue, &event);
-
-        if (event.type == ALLEGRO_EVENT_DISPLAY_CLOSE ||
-            (event.type == ALLEGRO_EVENT_KEY_DOWN && event.keyboard.keycode == ALLEGRO_KEY_ESCAPE)) {
-            running = false;
-        }
-        else if (event.type == ALLEGRO_EVENT_MOUSE_AXES) {
-            mouseX = event.mouse.x;
-            mouseY = event.mouse.y;
-
-
-            if (gameState == TITLE_SCREEN) {
-                startButton.isHovered = isMouseOverButton(startButton, mouseX, mouseY);
-            }
-        }
-
-    }
-    al_register_event_source(event_queue, al_get_display_event_source(display));
-    al_register_event_source(event_queue, al_get_timer_event_source(timer));
-    al_register_event_source(event_queue, al_get_keyboard_event_source());
-    al_register_event_source(event_queue, al_get_mouse_event_source());
-
-
-
+    // Inicjalizacja gracza
     Player player;
-    player.name = "Gladiator";
+    player.name = "Wojownik";
     player.level = 1;
     player.exp = 0;
     player.expToNext = 100;
     player.gold = 100;
-    player.stats = { 5, 5, 5, 5, 1.0, 1.0, 1.0, 1.0 };
-    player.maxHp = 100;
-    player.currentHp = 100;
+    player.stats.strength = 10;
+    player.stats.agility = 10;
+    player.stats.vitality = 10;
+    player.stats.magic = 10;
+    player.stats.strengthMult = 1.0;
+    player.stats.defenseMult = 1.0;
+    player.stats.healthMult = 1.0;
+    player.stats.magicMult = 1.0;
+    player.maxHp = calculateMaxHp(player);
+    player.currentHp = player.maxHp;
     player.energy = 100;
     player.maxEnergy = 100;
-    player.weapon = { "", 0, 0, 0, 0, "weapon", -1 };
-    player.armor = { "", 0, 0, 0, 0, "armor", -1 };
-    player.shield = { "", 0, 0, 0, 0, "shield", -1 };
     player.skillPoints = 0;
     player.wins = 0;
     player.losses = 0;
     player.saveSlot = 1;
     player.arenaLevel = 0;
-    player.arenaMaxLevel = 10;
-    player.defeatedBosses.resize(30, false);
 
-    clearScreen();
-    cout << "\n\n";
-    cout << "    -------------------------------------------------\n";
-    cout << "    !                                               !\n";
-    cout << "    !          GLADIATOR SOULS                      !\n";
-    cout << "    !          Arena RPG Game                       !\n";
-    cout << "    !                                               !\n";
-    cout << "    !          Stworz swojego wojownika             !\n";
-    cout << "    !          Trenuj, walcz i zwyciezaj!           !\n";
-    cout << "    !                                               !\n";
-    cout << "    -------------------------------------------------\n\n";
+    vector<Equipment> weapons = initWeapons();
+    vector<Equipment> armors = initArmors();
+    vector<Equipment> shields = initShields();
+    player.weapon = weapons[0];
+    player.armor = armors[0];
+    player.shield = shields[0];
 
-    cout << "1. Nowa gra\n";
-    cout << "2. Wczytaj gre\n\n";
-    cout << "Wybor: ";
+    // Lista przeciwników
+    vector<Enemy> enemies = {
+        {"Treningowy Manekn", 50, 50, 5, 2, 20, 10, 1, true},
+        {"Poczatkujacy Wojownik", 80, 80, 8, 4, 35, 20, 2, true},
+        {"Wykwalifikowany Wojownik", 120, 120, 12, 6, 55, 35, 3, true},
+        {"Weteran Areny", 180, 180, 18, 9, 80, 55, 5, true},
+        {"Elitarny Czempion", 250, 250, 25, 12, 120, 80, 7, true},
+        {"Mistrz Areny", 350, 350, 35, 16, 180, 120, 10, true},
+        {"Smok Rycerz", 500, 500, 45, 20, 250, 180, 13, true},
+        {"Cieniowy Zabojca", 400, 400, 60, 15, 300, 220, 15, true},
+        {"Wladca Demonow", 700, 700, 70, 25, 400, 300, 18, true},
+        {"Smierc Wcielona", 1000, 1000, 90, 30, 600, 500, 20, true},
+        {"Nieumarły Arcymag", 600, 600, 50, 35, 320, 280, 12, true},
+        {"Bestia Mroku", 800, 800, 75, 28, 450, 350, 16, true},
+        {"Krol Podziemi", 900, 900, 85, 32, 500, 400, 17, true},
+        {"Tytanicka Bestia", 1100, 1100, 100, 38, 700, 600, 22, true},
+        {"Szal Szamana", 650, 650, 55, 30, 350, 250, 14, true},
+        {"Lodowy Byt", 720, 720, 65, 35, 400, 320, 15, true},
+        {"Zakonnica Cieni", 500, 500, 70, 20, 300, 200, 13, true},
+        {"Wojownik Oblakow", 550, 550, 48, 25, 280, 240, 12, true},
+        {"Alchemik Zla", 480, 480, 60, 18, 260, 180, 11, true},
+        {"Strażnik Bram", 850, 850, 80, 40, 550, 450, 19, true},
+        {"Smok Czerni", 950, 950, 92, 42, 650, 500, 21, true},
+        {"Anioł Zagłady", 1000, 1000, 88, 45, 700, 550, 23, true},
+        {"Wampir Wielowiekowy", 700, 700, 68, 38, 400, 380, 18, true},
+        {"Wilkolak Alfa", 620, 620, 72, 26, 350, 280, 16, true},
+        {"Meduza Okrutna", 580, 580, 58, 22, 310, 220, 14, true},
+        {"Lich Niesmiertelny", 880, 880, 78, 48, 600, 500, 22, true},
+        {"Bestia Behemota", 1200, 1200, 110, 50, 800, 700, 25, true},
+        {"Władca Czasu", 950, 950, 95, 52, 750, 600, 24, true},
+        {"Destroyer Wszechświata", 1300, 1300, 120, 55, 900, 800, 26, true},
+        {"Nieznany Byt z Mroku", 1500, 1500, 150, 60, 1200, 1000, 30, true}
+    };
 
-    int startChoice;
-    cin >> startChoice;
-    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    GameState state = TITLE_SCREEN;
+    int selectedEnemy = -1;
+    int combatChoice = -1;
+    bool playerDefending = false;
+    int combo = 0;
 
-    if (startChoice == 2) {
-        clearScreen();
-        cout << "\n--- WCZYTAJ GRE ---\n\n";
-        for (int i = 1; i <= 3; i++) {
-            if (saveGameExists(i)) {
-                cout << i << ". [ZAJETNE] ";
-                ifstream file(getSaveFileName(i));
-                string playerName;
-                int level;
-                getline(file, playerName);
-                file >> level;
-                file.close();
-                cout << playerName << " - Poziom " << level << "\n";
-            }
-            else {
-                cout << i << ". [PUSTE]\n";
-            }
+    al_start_timer(timer);
+
+    bool running = true;
+    bool redraw = true;
+    int mouseX = 0, mouseY = 0;
+
+    while (running) {
+        ALLEGRO_EVENT event;
+        al_wait_for_event(queue, &event);
+
+        if (event.type == ALLEGRO_EVENT_TIMER) {
+            redraw = true;
         }
-        cout << "\nWybor gniazda: ";
-
-        int slotChoice;
-        cin >> slotChoice;
-        cin.ignore(numeric_limits<streamsize>::max(), '\n');
-
-        if (slotChoice >= 1 && slotChoice <= 3) {
-            player.saveSlot = slotChoice;
-            if (loadGame(player)) {
-                cout << "\nGra wczytana!\n";
-                pause();
-            }
-            else {
-                cout << "\nBlad: Nie mozna wczytac gry!\n";
-                pause();
-                allegro_running = false;
-                this_thread::sleep_for(chrono::milliseconds(100));
-                al_destroy_event_queue(event_queue);
-                al_destroy_timer(timer);
-                al_destroy_display(display);
-                return 1;
-            }
+        else if (event.type == ALLEGRO_EVENT_DISPLAY_CLOSE) {
+            running = false;
         }
-        else {
-            cout << "\nZly wybor!\n";
-            allegro_running = false;
-            this_thread::sleep_for(chrono::milliseconds(100));
-            al_destroy_event_queue(event_queue);
-            al_destroy_timer(timer);
-            al_destroy_display(display);
-            return 1;
+        else if (event.type == ALLEGRO_EVENT_MOUSE_AXES) {
+            mouseX = event.mouse.x;
+            mouseY = event.mouse.y;
         }
-    }
-    else {
-        clearScreen();
-        cout << "\n--- NOWA GRA ---\n\n";
-
-        cout << "Wybierz gniazdo zapisu (1, 2 lub 3): ";
-        int slotChoice;
-        cin >> slotChoice;
-        cin.ignore(numeric_limits<streamsize>::max(), '\n');
-
-        if (slotChoice >= 1 && slotChoice <= 3) {
-            player.saveSlot = slotChoice;
-
-            if (saveGameExists(slotChoice)) {
-                cout << "\nGniazdo zawiera juz zapis! Czy chcesz go nadpisac? (T/N): ";
-                char confirm;
-                cin >> confirm;
-                cin.ignore(numeric_limits<streamsize>::max(), '\n');
-
-                if (confirm != 'T' && confirm != 't') {
-                    cout << "Anulowano.\n";
-                    allegro_running = false;
-                    this_thread::sleep_for(chrono::milliseconds(100));
-                    al_destroy_event_queue(event_queue);
-                    al_destroy_timer(timer);
-                    al_destroy_display(display);
-                    return 1;
+        else if (event.type == ALLEGRO_EVENT_MOUSE_BUTTON_DOWN) {
+            // TITLE SCREEN
+            if (state == TITLE_SCREEN) {
+                Button startBtn = createButton(SCREEN_W / 2 - 150, SCREEN_H / 2, 300, 60,
+                    "START", al_map_rgb(50, 120, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 160, 70));
+                if (isMouseOverButton(startBtn, mouseX, mouseY)) {
+                    state = MENU;
                 }
             }
+            // MENU
+            else if (state == MENU) {
+                Button arenaBtn = createButton(SCREEN_W / 2 - 150, 300, 300, 60,
+                    "ARENA", al_map_rgb(200, 50, 50), al_map_rgb(255, 255, 255), al_map_rgb(220, 70, 70));
+                Button shopBtn = createButton(SCREEN_W / 2 - 150, 400, 300, 60,
+                    "SKLEP", al_map_rgb(50, 50, 200), al_map_rgb(255, 255, 255), al_map_rgb(70, 70, 220));
+                Button statsBtn = createButton(SCREEN_W / 2 - 150, 500, 300, 60,
+                    "STATYSTYKI", al_map_rgb(150, 50, 150), al_map_rgb(255, 255, 255), al_map_rgb(170, 70, 170));
 
-            cout << "Podaj imie swojego gladiatora: ";
-            getline(cin, player.name);
+                if (isMouseOverButton(arenaBtn, mouseX, mouseY)) {
+                    state = ARENA;
+                }
+                else if (isMouseOverButton(shopBtn, mouseX, mouseY)) {
+                    state = SHOP;
+                }
+                else if (isMouseOverButton(statsBtn, mouseX, mouseY)) {
+                    state = STATYSTYKI;
+                }
+            }
+            // ARENA - wybor przeciwnika
+            else if (state == ARENA) {
+                float btnW = 220;
+                float btnH = 50;
+                float startX = 50;
+                float startY = 150;
+                float gapX = 20;
+                float gapY = 15;
+
+                for (int i = 0; i < 30; i++) {
+                    int row = i / 6;
+                    int col = i % 6;
+                    float x = startX + col * (btnW + gapX);
+                    float y = startY + row * (btnH + gapY);
+
+                    Button enemyBtn = createButton(x, y, btnW, btnH, "",
+                        al_map_rgb(150, 50, 50), al_map_rgb(255, 255, 255), al_map_rgb(200, 70, 70));
+
+                    if (isMouseOverButton(enemyBtn, mouseX, mouseY)) {
+                        selectedEnemy = i;
+                        enemies[i].hp = enemies[i].maxHp;
+                        player.currentHp = player.maxHp;
+                        combo = 0;
+                        state = FIGHT;
+                        break;
+                    }
+                }
+
+                Button backBtn = createButton(SCREEN_W / 2 - 100, 850, 200, 50,
+                    "POWROT", al_map_rgb(100, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 130));
+                if (isMouseOverButton(backBtn, mouseX, mouseY)) {
+                    state = MENU;
+                }
+            }
+            // WALKA
+            else if (state == FIGHT && selectedEnemy >= 0) {
+                Button attackBtn = createButton(100, 700, 200, 60,
+                    "ATAK (100%)", al_map_rgb(150, 50, 50), al_map_rgb(255, 255, 255), al_map_rgb(180, 70, 70));
+                Button heavyBtn = createButton(350, 700, 200, 60,
+                    "CIEZKI (180%)", al_map_rgb(200, 30, 30), al_map_rgb(255, 255, 255), al_map_rgb(220, 50, 50));
+                Button quickBtn = createButton(600, 700, 200, 60,
+                    "SZYBKI (60%)", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
+                Button magicBtn = createButton(850, 700, 200, 60,
+                    "MAGIA (120%)", al_map_rgb(100, 50, 200), al_map_rgb(255, 255, 255), al_map_rgb(120, 70, 220));
+                Button defenseBtn = createButton(1100, 700, 200, 60,
+                    "OBRONA", al_map_rgb(50, 100, 150), al_map_rgb(255, 255, 255), al_map_rgb(70, 120, 180));
+
+                if (isMouseOverButton(attackBtn, mouseX, mouseY)) {
+                    combatChoice = 1;
+                }
+                else if (isMouseOverButton(heavyBtn, mouseX, mouseY)) {
+                    combatChoice = 2;
+                }
+                else if (isMouseOverButton(quickBtn, mouseX, mouseY)) {
+                    combatChoice = 3;
+                }
+                else if (isMouseOverButton(magicBtn, mouseX, mouseY)) {
+                    combatChoice = 4;
+                }
+                else if (isMouseOverButton(defenseBtn, mouseX, mouseY)) {
+                    combatChoice = 5;
+                }
+
+                // Wykonaj turę walki
+                if (combatChoice > 0) {
+                    Enemy& enemy = enemies[selectedEnemy];
+                    playerDefending = false;
+                    int playerDamage = calculateDamage(player);
+                    double hitChance = 0.85;
+
+                    if (combatChoice == 1) hitChance = 0.85;
+                    else if (combatChoice == 2) { playerDamage = (int)(playerDamage * 1.8); hitChance = 0.65; }
+                    else if (combatChoice == 3) { playerDamage = (int)(playerDamage * 0.6); hitChance = 0.95; }
+                    else if (combatChoice == 4) { playerDamage = (int)(playerDamage * 1.2 + player.stats.magic * 3); hitChance = 0.75; }
+                    else if (combatChoice == 5) playerDefending = true;
+
+                    if (!playerDefending) {
+                        double roll = (double)rand() / RAND_MAX;
+                        if (roll < hitChance) {
+                            int finalDamage = max(1, playerDamage - enemy.defense / 2);
+                            enemy.hp -= finalDamage;
+                            combo++;
+                        }
+                        else {
+                            combo = 0;
+                        }
+                    }
+
+                    // Atak wroga
+                    if (enemy.hp > 0) {
+                        int enemyDamage = enemy.damage + rand() % 5;
+                        double enemyHitChance = 0.75 - (player.stats.agility * 0.01);
+                        if (enemyHitChance < 0.3) enemyHitChance = 0.3;
+                        double roll = (double)rand() / RAND_MAX;
+
+                        if (roll < enemyHitChance) {
+                            int defense = calculateDefense(player);
+                            if (playerDefending) defense *= 2;
+                            int finalDamage = max(1, enemyDamage - defense);
+                            player.currentHp -= finalDamage;
+                        }
+                    }
+
+                    // Sprawdź koniec walki
+                    if (enemy.hp <= 0) {
+                        player.wins++;
+                        player.gold += enemy.gold;
+                        if (enemy.firstTimeReward) {
+                            player.gold += enemy.gold * 2;
+                            enemy.firstTimeReward = false;
+                        }
+                        gainExp(player, enemy.exp);
+                        state = ARENA;
+                    }
+                    else if (player.currentHp <= 0) {
+                        player.losses++;
+                        player.gold /= 2;
+                        player.currentHp = player.maxHp / 2;
+                        state = ARENA;
+                    }
+
+                    combatChoice = -1;
+                }
+            }
+            // SKLEP
+            else if (state == SHOP) {
+                Button weaponBtn = createButton(SCREEN_W / 2 - 150, 300, 300, 60,
+                    "BRONIE", al_map_rgb(150, 100, 50), al_map_rgb(255, 255, 255), al_map_rgb(180, 120, 70));
+                Button armorBtn = createButton(SCREEN_W / 2 - 150, 400, 300, 60,
+                    "ZBROJE", al_map_rgb(100, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 130));
+                Button shieldBtn = createButton(SCREEN_W / 2 - 150, 500, 300, 60,
+                    "TARCZE", al_map_rgb(80, 100, 150), al_map_rgb(255, 255, 255), al_map_rgb(100, 120, 180));
+                Button buyWeaponBtn = createButton(100, 700, 200, 50,
+                    "KUP BRON", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
+                Button buyArmorBtn = createButton(350, 700, 200, 50,
+                    "KUP ZBROJE", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
+                Button buyShieldBtn = createButton(600, 700, 200, 50,
+                    "KUP TARCZE", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
+                Button backBtn = createButton(SCREEN_W / 2 - 100, 800, 200, 50,
+                    "POWROT", al_map_rgb(100, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 130));
+
+                if (isMouseOverButton(buyWeaponBtn, mouseX, mouseY)) {
+                    int nextLevel = player.weapon.level + 1;
+                    if (nextLevel < (int)weapons.size() && player.gold >= weapons[nextLevel].price) {
+                        player.gold -= weapons[nextLevel].price;
+                        player.weapon = weapons[nextLevel];
+                    }
+                }
+                else if (isMouseOverButton(buyArmorBtn, mouseX, mouseY)) {
+                    int nextLevel = player.armor.level + 1;
+                    if (nextLevel < (int)armors.size() && player.gold >= armors[nextLevel].price) {
+                        player.gold -= armors[nextLevel].price;
+                        player.armor = armors[nextLevel];
+                        player.maxHp = calculateMaxHp(player);
+                        player.currentHp = player.maxHp;
+                    }
+                }
+                else if (isMouseOverButton(buyShieldBtn, mouseX, mouseY)) {
+                    int nextLevel = player.shield.level + 1;
+                    if (nextLevel < (int)shields.size() && player.gold >= shields[nextLevel].price) {
+                        player.gold -= shields[nextLevel].price;
+                        player.shield = shields[nextLevel];
+                    }
+                }
+                else if (isMouseOverButton(backBtn, mouseX, mouseY)) {
+                    state = MENU;
+                }
+            }
+            // STATYSTYKI
+            else if (state == STATYSTYKI) {
+                Button backBtn = createButton(SCREEN_W / 2 - 100, 800, 200, 50,
+                    "POWROT", al_map_rgb(100, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 130));
+                if (isMouseOverButton(backBtn, mouseX, mouseY)) {
+                    state = MENU;
+                }
+            }
         }
-        else {
-            cout << "Zly wybor!\n";
-            allegro_running = false;
-            this_thread::sleep_for(chrono::milliseconds(100));
-            al_destroy_event_queue(event_queue);
-            al_destroy_timer(timer);
-            al_destroy_display(display);
-            return 1;
+
+        if (redraw && al_is_event_queue_empty(queue)) {
+            redraw = false;
+            al_clear_to_color(al_map_rgb(20, 30, 50));
+
+            // TITLE SCREEN
+            if (state == TITLE_SCREEN) {
+                al_draw_text(titleFont, al_map_rgb(255, 215, 0), SCREEN_W / 2, 200,
+                    ALLEGRO_ALIGN_CENTRE, "MISTRZOWIE OSTRZA");
+                Button startBtn = createButton(SCREEN_W / 2 - 150, SCREEN_H / 2, 300, 60,
+                    "START", al_map_rgb(50, 120, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 160, 70));
+                startBtn.isHovered = isMouseOverButton(startBtn, mouseX, mouseY);
+                drawButton(startBtn, font);
+            }
+            // MENU
+            else if (state == MENU) {
+                al_draw_text(titleFont, al_map_rgb(255, 215, 0), SCREEN_W / 2, 100,
+                    ALLEGRO_ALIGN_CENTRE, "MENU GLOWNE");
+
+                char statsText[256];
+                sprintf(statsText, "%s | Poziom: %d | Zloto: %d | HP: %d/%d",
+                    player.name.c_str(), player.level, player.gold, player.currentHp, player.maxHp);
+                al_draw_text(font, al_map_rgb(255, 255, 255), SCREEN_W / 2, 200,
+                    ALLEGRO_ALIGN_CENTRE, statsText);
+
+                Button arenaBtn = createButton(SCREEN_W / 2 - 150, 300, 300, 60,
+                    "ARENA", al_map_rgb(200, 50, 50), al_map_rgb(255, 255, 255), al_map_rgb(220, 70, 70));
+                Button shopBtn = createButton(SCREEN_W / 2 - 150, 400, 300, 60,
+                    "SKLEP", al_map_rgb(50, 50, 200), al_map_rgb(255, 255, 255), al_map_rgb(70, 70, 220));
+                Button statsBtn = createButton(SCREEN_W / 2 - 150, 500, 300, 60,
+                    "STATYSTYKI", al_map_rgb(150, 50, 150), al_map_rgb(255, 255, 255), al_map_rgb(170, 70, 170));
+
+                arenaBtn.isHovered = isMouseOverButton(arenaBtn, mouseX, mouseY);
+                shopBtn.isHovered = isMouseOverButton(shopBtn, mouseX, mouseY);
+                statsBtn.isHovered = isMouseOverButton(statsBtn, mouseX, mouseY);
+
+                drawButton(arenaBtn, font);
+                drawButton(shopBtn, font);
+                drawButton(statsBtn, font);
+            }
+            // ARENA
+            else if (state == ARENA) {
+                al_draw_text(titleFont, al_map_rgb(255, 100, 100), SCREEN_W / 2, 30,
+                    ALLEGRO_ALIGN_CENTRE, "ARENA WALKI");
+
+                char statsText[256];
+                sprintf(statsText, "Poziom: %d | Zloto: %d | Zwyciestwa: %d | Porazki: %d",
+                    player.level, player.gold, player.wins, player.losses);
+                al_draw_text(font, al_map_rgb(255, 255, 255), SCREEN_W / 2, 100,
+                    ALLEGRO_ALIGN_CENTRE, statsText);
+
+                float btnW = 220;
+                float btnH = 50;
+                float startX = 50;
+                float startY = 150;
+                float gapX = 20;
+                float gapY = 15;
+
+                for (int i = 0; i < 30; i++) {
+                    int row = i / 6;
+                    int col = i % 6;
+                    float x = startX + col * (btnW + gapX);
+                    float y = startY + row * (btnH + gapY);
+
+                    Button enemyBtn = createButton(x, y, btnW, btnH, "",
+                        al_map_rgb(150, 50, 50), al_map_rgb(255, 255, 255), al_map_rgb(200, 70, 70));
+                    enemyBtn.isHovered = isMouseOverButton(enemyBtn, mouseX, mouseY);
+                    drawButton(enemyBtn, smallFont);
+
+                    char text[128];
+                    sprintf(text, "%d. %s", i + 1, enemies[i].name.c_str());
+                    al_draw_text(smallFont, al_map_rgb(255, 255, 255), x + btnW / 2, y + 5,
+                        ALLEGRO_ALIGN_CENTRE, text);
+                    sprintf(text, "Lvl %d | HP: %d", enemies[i].level, enemies[i].maxHp);
+                    al_draw_text(smallFont, al_map_rgb(200, 200, 200), x + btnW / 2, y + 28,
+                        ALLEGRO_ALIGN_CENTRE, text);
+                }
+
+                Button backBtn = createButton(SCREEN_W / 2 - 100, 850, 200, 50,
+                    "POWROT", al_map_rgb(100, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 130));
+                backBtn.isHovered = isMouseOverButton(backBtn, mouseX, mouseY);
+                drawButton(backBtn, font);
+            }
+            // WALKA
+            else if (state == FIGHT && selectedEnemy >= 0) {
+                Enemy& enemy = enemies[selectedEnemy];
+
+                al_draw_text(titleFont, al_map_rgb(255, 100, 100), SCREEN_W / 2, 30,
+                    ALLEGRO_ALIGN_CENTRE, "WALKA!");
+
+                // Rysuj postać (zielony kwadrat)
+                drawPlayer(200, 300, 150);
+                al_draw_text(font, al_map_rgb(255, 255, 255), 275, 470,
+                    ALLEGRO_ALIGN_CENTRE, player.name.c_str());
+                drawHealthBar(150, 500, 250, 30, player.currentHp, player.maxHp, al_map_rgb(50, 200, 50));
+
+                // Rysuj przeciwnika (czerwony kwadrat)
+                drawEnemy(1150, 300, 150);
+                al_draw_text(font, al_map_rgb(255, 255, 255), 1225, 470,
+                    ALLEGRO_ALIGN_CENTRE, enemy.name.c_str());
+                drawHealthBar(1100, 500, 250, 30, enemy.hp, enemy.maxHp, al_map_rgb(200, 50, 50));
+
+                // Combo
+                char comboText[64];
+                sprintf(comboText, "COMBO: %dx", combo);
+                al_draw_text(font, al_map_rgb(255, 255, 0), SCREEN_W / 2, 250,
+                    ALLEGRO_ALIGN_CENTRE, comboText);
+
+                // Przyciski ataku
+                Button attackBtn = createButton(100, 700, 200, 60,
+                    "ATAK (100%)", al_map_rgb(150, 50, 50), al_map_rgb(255, 255, 255), al_map_rgb(180, 70, 70));
+                Button heavyBtn = createButton(350, 700, 200, 60,
+                    "CIEZKI (180%)", al_map_rgb(200, 30, 30), al_map_rgb(255, 255, 255), al_map_rgb(220, 50, 50));
+                Button quickBtn = createButton(600, 700, 200, 60,
+                    "SZYBKI (60%)", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
+                Button magicBtn = createButton(850, 700, 200, 60,
+                    "MAGIA (120%)", al_map_rgb(100, 50, 200), al_map_rgb(255, 255, 255), al_map_rgb(120, 70, 220));
+                Button defenseBtn = createButton(1100, 700, 200, 60,
+                    "OBRONA", al_map_rgb(50, 100, 150), al_map_rgb(255, 255, 255), al_map_rgb(70, 120, 180));
+
+                attackBtn.isHovered = isMouseOverButton(attackBtn, mouseX, mouseY);
+                heavyBtn.isHovered = isMouseOverButton(heavyBtn, mouseX, mouseY);
+                quickBtn.isHovered = isMouseOverButton(quickBtn, mouseX, mouseY);
+                magicBtn.isHovered = isMouseOverButton(magicBtn, mouseX, mouseY);
+                defenseBtn.isHovered = isMouseOverButton(defenseBtn, mouseX, mouseY);
+
+                drawButton(attackBtn, smallFont);
+                drawButton(heavyBtn, smallFont);
+                drawButton(quickBtn, smallFont);
+                drawButton(magicBtn, smallFont);
+                drawButton(defenseBtn, smallFont);
+            }
+            // SKLEP
+            else if (state == SHOP) {
+                al_draw_text(titleFont, al_map_rgb(100, 150, 255), SCREEN_W / 2, 50,
+                    ALLEGRO_ALIGN_CENTRE, "SKLEP");
+
+                char goldText[64];
+                sprintf(goldText, "Zloto: %d", player.gold);
+                al_draw_text(font, al_map_rgb(255, 215, 0), SCREEN_W / 2, 150,
+                    ALLEGRO_ALIGN_CENTRE, goldText);
+
+                // Wyświetl ekwipunek
+                char equipText[256];
+                sprintf(equipText, "Bron: %s (+%d DMG)", player.weapon.name.c_str(), player.weapon.value);
+                al_draw_text(font, al_map_rgb(255, 255, 255), SCREEN_W / 2, 250,
+                    ALLEGRO_ALIGN_CENTRE, equipText);
+                sprintf(equipText, "Zbroja: %s (+%d DEF)", player.armor.name.c_str(), player.armor.defenseValue);
+                al_draw_text(font, al_map_rgb(255, 255, 255), SCREEN_W / 2, 300,
+                    ALLEGRO_ALIGN_CENTRE, equipText);
+                sprintf(equipText, "Tarcza: %s (+%d DEF)", player.shield.name.c_str(), player.shield.defenseValue);
+                al_draw_text(font, al_map_rgb(255, 255, 255), SCREEN_W / 2, 350,
+                    ALLEGRO_ALIGN_CENTRE, equipText);
+
+                // Dostępne ulepszenia
+                al_draw_text(font, al_map_rgb(200, 200, 200), SCREEN_W / 2, 450,
+                    ALLEGRO_ALIGN_CENTRE, "Dostepne ulepszenia:");
+
+                int nextWeaponLvl = player.weapon.level + 1;
+                if (nextWeaponLvl < (int)weapons.size()) {
+                    sprintf(equipText, "Bron: %s (+%d DMG) - %d zlota",
+                        weapons[nextWeaponLvl].name.c_str(), weapons[nextWeaponLvl].value, weapons[nextWeaponLvl].price);
+                    al_draw_text(smallFont, al_map_rgb(200, 200, 200), 100, 520, 0, equipText);
+                }
+
+                int nextArmorLvl = player.armor.level + 1;
+                if (nextArmorLvl < (int)armors.size()) {
+                    sprintf(equipText, "Zbroja: %s (+%d DEF) - %d zlota",
+                        armors[nextArmorLvl].name.c_str(), armors[nextArmorLvl].defenseValue, armors[nextArmorLvl].price);
+                    al_draw_text(smallFont, al_map_rgb(200, 200, 200), 350, 520, 0, equipText);
+                }
+
+                int nextShieldLvl = player.shield.level + 1;
+                if (nextShieldLvl < (int)shields.size()) {
+                    sprintf(equipText, "Tarcza: %s (+%d DEF) - %d zlota",
+                        shields[nextShieldLvl].name.c_str(), shields[nextShieldLvl].defenseValue, shields[nextShieldLvl].price);
+                    al_draw_text(smallFont, al_map_rgb(200, 200, 200), 600, 520, 0, equipText);
+                }
+
+                Button buyWeaponBtn = createButton(100, 700, 200, 50,
+                    "KUP BRON", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
+                Button buyArmorBtn = createButton(350, 700, 200, 50,
+                    "KUP ZBROJE", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
+                Button buyShieldBtn = createButton(600, 700, 200, 50,
+                    "KUP TARCZE", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
+                Button backBtn = createButton(SCREEN_W / 2 - 100, 800, 200, 50,
+                    "POWROT", al_map_rgb(100, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 130));
+
+                buyWeaponBtn.isHovered = isMouseOverButton(buyWeaponBtn, mouseX, mouseY);
+                buyArmorBtn.isHovered = isMouseOverButton(buyArmorBtn, mouseX, mouseY);
+                buyShieldBtn.isHovered = isMouseOverButton(buyShieldBtn, mouseX, mouseY);
+                backBtn.isHovered = isMouseOverButton(backBtn, mouseX, mouseY);
+
+                drawButton(buyWeaponBtn, smallFont);
+                drawButton(buyArmorBtn, smallFont);
+                drawButton(buyShieldBtn, smallFont);
+                drawButton(backBtn, font);
+            }
+            // STATYSTYKI
+            else if (state == STATYSTYKI) {
+                al_draw_text(titleFont, al_map_rgb(200, 100, 200), SCREEN_W / 2, 50,
+                    ALLEGRO_ALIGN_CENTRE, "STATYSTYKI");
+
+                char statText[256];
+                sprintf(statText, "Imie: %s", player.name.c_str());
+                al_draw_text(font, al_map_rgb(255, 255, 255), SCREEN_W / 2, 200, ALLEGRO_ALIGN_CENTRE, statText);
+                sprintf(statText, "Poziom: %d | EXP: %d/%d", player.level, player.exp, player.expToNext);
+                al_draw_text(font, al_map_rgb(255, 255, 255), SCREEN_W / 2, 250, ALLEGRO_ALIGN_CENTRE, statText);
+                sprintf(statText, "HP: %d/%d | Energia: %d/%d", player.currentHp, player.maxHp, player.energy, player.maxEnergy);
+                al_draw_text(font, al_map_rgb(255, 255, 255), SCREEN_W / 2, 300, ALLEGRO_ALIGN_CENTRE, statText);
+                sprintf(statText, "Zloto: %d", player.gold);
+                al_draw_text(font, al_map_rgb(255, 215, 0), SCREEN_W / 2, 350, ALLEGRO_ALIGN_CENTRE, statText);
+
+                sprintf(statText, "Sila: %d | Zrecznosc: %d", player.stats.strength, player.stats.agility);
+                al_draw_text(font, al_map_rgb(200, 200, 200), SCREEN_W / 2, 420, ALLEGRO_ALIGN_CENTRE, statText);
+                sprintf(statText, "Witalnosc: %d | Magia: %d", player.stats.vitality, player.stats.magic);
+                al_draw_text(font, al_map_rgb(200, 200, 200), SCREEN_W / 2, 470, ALLEGRO_ALIGN_CENTRE, statText);
+
+                sprintf(statText, "Zwyciestwa: %d | Porazki: %d", player.wins, player.losses);
+                al_draw_text(font, al_map_rgb(200, 200, 200), SCREEN_W / 2, 540, ALLEGRO_ALIGN_CENTRE, statText);
+
+                sprintf(statText, "Obrazenia: x%.2f | Obrona: x%.2f", player.stats.strengthMult, player.stats.defenseMult);
+                al_draw_text(font, al_map_rgb(150, 150, 255), SCREEN_W / 2, 610, ALLEGRO_ALIGN_CENTRE, statText);
+                sprintf(statText, "Zdrowie: x%.2f | Magia: x%.2f", player.stats.healthMult, player.stats.magicMult);
+                al_draw_text(font, al_map_rgb(150, 150, 255), SCREEN_W / 2, 660, ALLEGRO_ALIGN_CENTRE, statText);
+
+                Button backBtn = createButton(SCREEN_W / 2 - 100, 800, 200, 50,
+                    "POWROT", al_map_rgb(100, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 130));
+                backBtn.isHovered = isMouseOverButton(backBtn, mouseX, mouseY);
+                drawButton(backBtn, font);
+            }
+
+            al_flip_display();
         }
     }
 
-    while (allegro_running) {
-        clearScreen();
-        displayHeader("MENU GLOWNE");
-        displayPlayerStats(player);
-        displayEquipment(player);
-
-        cout << "\n1. Centrum Treningowe\n";
-        cout << "2. Arena Walki\n";
-        cout << "3. Sklep\n";
-        cout << "4. Ulepszenia Statystyk\n";
-        cout << "5. Zapisz gre\n";
-        cout << "6. Zarzadzaj zapisami\n";
-        cout << "7. Zakonczy gre\n\n";
-
-        cout << "Wybor: ";
-
-        int choice;
-        cin >> choice;
-        cin.ignore(numeric_limits<streamsize>::max(), '\n');
-
-        switch (choice) {
-        case 1:
-            trainingMenu(player);
-            break;
-        case 2:
-            arenaMenu(player);
-            break;
-        case 3:
-            shop(player);
-            break;
-        case 4:
-            if (player.skillPoints > 0) {
-                upgradeStats(player);
-            }
-            else {
-                cout << "\nBrak dostepnych punktow umiejetnosci!\n";
-                pause();
-            }
-            break;
-        case 5:
-            saveGame(player);
-            pause();
-            break;
-        case 6:
-            manageSaves();
-            break;
-        case 7:
-            clearScreen();
-            cout << "\n\n=== STATYSTYKI KONCOWE ===\n\n";
-            displayPlayerStats(player);
-            cout << "\nDziekujemy za gre!\n\n";
-            allegro_running = false;
-            break;
-        default:
-            cout << "\nZly wybor!\n";
-            pause();
-        }
-    }
-
-    // Cleanup
-    allegro_running = false;
-    this_thread::sleep_for(chrono::milliseconds(100)); // Poczekaj na zakończenie wątku
-    al_destroy_event_queue(event_queue);
+    al_destroy_font(font);
+    al_destroy_font(titleFont);
+    al_destroy_font(smallFont);
     al_destroy_timer(timer);
+    al_destroy_event_queue(queue);
     al_destroy_display(display);
 
     return 0;
