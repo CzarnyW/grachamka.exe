@@ -1351,9 +1351,6 @@ void upgradeStats(Player& player) {
     }
 }
 
-
-
-
 void drawPlayer(float x, float y, float size) {
     al_draw_filled_rectangle(x, y, x + size, y + size, al_map_rgb(50, 200, 50));
     al_draw_rectangle(x, y, x + size, y + size, al_map_rgb(255, 255, 255), 2);
@@ -1371,6 +1368,20 @@ void drawHealthBar(float x, float y, float width, float height, int current, int
     al_draw_rectangle(x, y, x + width, y + height, al_map_rgb(255, 255, 255), 2);
 }
 
+// Nowa funkcja do rysowania pola tekstowego
+void drawTextInput(float x, float y, float width, float height, const string& text, bool active, ALLEGRO_FONT* font) {
+    ALLEGRO_COLOR bgColor = active ? al_map_rgb(70, 70, 100) : al_map_rgb(50, 50, 70);
+    al_draw_filled_rectangle(x, y, x + width, y + height, bgColor);
+    al_draw_rectangle(x, y, x + width, y + height, al_map_rgb(255, 255, 255), 2);
+
+    string displayText = text;
+    if (active && (int)(al_get_time() * 2) % 2 == 0) {
+        displayText += "_";
+    }
+
+    al_draw_text(font, al_map_rgb(255, 255, 255), x + 10, y + height / 2 - al_get_font_line_height(font) / 2, 0, displayText.c_str());
+}
+
 int main() {
     srand(static_cast<unsigned int>(time(0)));
 
@@ -1385,7 +1396,20 @@ int main() {
     al_init_font_addon();
     al_init_ttf_addon();
 
-    ALLEGRO_DISPLAY* display = al_create_display(SCREEN_W, SCREEN_H);
+    // Pobierz rozdzielczość monitora
+    ALLEGRO_MONITOR_INFO monitor_info;
+    al_get_monitor_info(0, &monitor_info);
+
+    int screen_w = monitor_info.x2 - monitor_info.x1;
+    int screen_h = monitor_info.y2 - monitor_info.y1;
+
+    // Użyj 90% rozmiaru ekranu dla trybu okienkowego
+    int windowed_w = (int)(screen_w * 0.9);
+    int windowed_h = (int)(screen_h * 0.9);
+
+    bool fullscreen = false;
+
+    ALLEGRO_DISPLAY* display = al_create_display(windowed_w, windowed_h);
     if (!display) {
         cerr << "Blad tworzenia okna!" << endl;
         return -1;
@@ -1393,12 +1417,21 @@ int main() {
 
     al_set_window_title(display, "Mistrzowie Ostrza");
 
+    // Oblicz współczynniki skalowania
+    float scale_x = (float)windowed_w / SCREEN_W;
+    float scale_y = (float)windowed_h / SCREEN_H;
+
     ALLEGRO_EVENT_QUEUE* queue = al_create_event_queue();
     ALLEGRO_TIMER* timer = al_create_timer(1.0 / 60);
 
-    ALLEGRO_FONT* font = al_load_ttf_font("arial.ttf", 20, 0);
-    ALLEGRO_FONT* titleFont = al_load_ttf_font("arial.ttf", 48, 0);
-    ALLEGRO_FONT* smallFont = al_load_ttf_font("arial.ttf", 16, 0);
+    // Skaluj rozmiar czcionek proporcjonalnie
+    int base_font_size = (int)(20 * scale_y);
+    int title_font_size = (int)(48 * scale_y);
+    int small_font_size = (int)(16 * scale_y);
+
+    ALLEGRO_FONT* font = al_load_ttf_font("arial.ttf", base_font_size, 0);
+    ALLEGRO_FONT* titleFont = al_load_ttf_font("arial.ttf", title_font_size, 0);
+    ALLEGRO_FONT* smallFont = al_load_ttf_font("arial.ttf", small_font_size, 0);
 
     if (!font || !titleFont || !smallFont) {
         font = al_create_builtin_font();
@@ -1413,7 +1446,7 @@ int main() {
 
     // Inicjalizacja gracza
     Player player;
-    player.name = "Wojownik";
+    player.name = "";
     player.level = 1;
     player.exp = 0;
     player.expToNext = 100;
@@ -1426,8 +1459,8 @@ int main() {
     player.stats.defenseMult = 1.0;
     player.stats.healthMult = 1.0;
     player.stats.magicMult = 1.0;
-    player.maxHp = calculateMaxHp(player);
-    player.currentHp = player.maxHp;
+    player.maxHp = 100;
+    player.currentHp = 100;
     player.energy = 100;
     player.maxEnergy = 100;
     player.skillPoints = 0;
@@ -1439,9 +1472,6 @@ int main() {
     vector<Equipment> weapons = initWeapons();
     vector<Equipment> armors = initArmors();
     vector<Equipment> shields = initShields();
-    player.weapon = weapons[0];
-    player.armor = armors[0];
-    player.shield = shields[0];
 
     // Lista przeciwników
     vector<Enemy> enemies = {
@@ -1482,6 +1512,12 @@ int main() {
     int combatChoice = -1;
     bool playerDefending = false;
     int combo = 0;
+    string playerNameInput = "";
+    bool inputActive = false;
+    int selectedSaveSlot = 0;
+    bool showLevelUp = false;
+    float levelUpTimer = 0;
+    int previousLevel = player.level;
 
     al_start_timer(timer);
 
@@ -1495,6 +1531,22 @@ int main() {
 
         if (event.type == ALLEGRO_EVENT_TIMER) {
             redraw = true;
+
+            // Timer dla powiadomienia o awansie
+            if (showLevelUp) {
+                levelUpTimer += 1.0 / 60.0;
+                if (levelUpTimer > 3.0) {
+                    showLevelUp = false;
+                    levelUpTimer = 0;
+                }
+            }
+
+            // Sprawdź czy był awans
+            if (player.level > previousLevel) {
+                showLevelUp = true;
+                levelUpTimer = 0;
+                previousLevel = player.level;
+            }
         }
         else if (event.type == ALLEGRO_EVENT_DISPLAY_CLOSE) {
             running = false;
@@ -1503,23 +1555,169 @@ int main() {
             mouseX = event.mouse.x;
             mouseY = event.mouse.y;
         }
+        else if (event.type == ALLEGRO_EVENT_KEY_DOWN) {
+            // F11 - przełączanie fullscreen
+            if (event.keyboard.keycode == ALLEGRO_KEY_F11) {
+                fullscreen = !fullscreen;
+                al_destroy_display(display);
+
+                if (fullscreen) {
+                    al_set_new_display_flags(ALLEGRO_FULLSCREEN_WINDOW);
+                    display = al_create_display(screen_w, screen_h);
+                    scale_x = (float)screen_w / SCREEN_W;
+                    scale_y = (float)screen_h / SCREEN_H;
+                }
+                else {
+                    al_set_new_display_flags(0);
+                    display = al_create_display(windowed_w, windowed_h);
+                    scale_x = (float)windowed_w / SCREEN_W;
+                    scale_y = (float)windowed_h / SCREEN_H;
+                }
+
+                al_register_event_source(queue, al_get_display_event_source(display));
+            }
+
+            // Obsługa wpisywania nazwy
+            if (inputActive && state == NOWA_GRA) {
+                if (event.keyboard.keycode == ALLEGRO_KEY_BACKSPACE) {
+                    if (!playerNameInput.empty()) {
+                        playerNameInput.pop_back();
+                    }
+                }
+                else if (event.keyboard.keycode == ALLEGRO_KEY_ENTER) {
+                    if (!playerNameInput.empty() && selectedSaveSlot > 0) {
+                        // Utwórz nową grę
+                        player.name = playerNameInput;
+                        player.level = 1;
+                        player.exp = 0;
+                        player.expToNext = 100;
+                        player.gold = 100;
+                        player.stats.strength = 10;
+                        player.stats.agility = 10;
+                        player.stats.vitality = 10;
+                        player.stats.magic = 10;
+                        player.stats.strengthMult = 1.0;
+                        player.stats.defenseMult = 1.0;
+                        player.stats.healthMult = 1.0;
+                        player.stats.magicMult = 1.0;
+                        player.maxHp = calculateMaxHp(player);
+                        player.currentHp = player.maxHp;
+                        player.energy = 100;
+                        player.maxEnergy = 100;
+                        player.skillPoints = 0;
+                        player.wins = 0;
+                        player.losses = 0;
+                        player.saveSlot = selectedSaveSlot;
+                        player.arenaLevel = 0;
+                        player.weapon = weapons[0];
+                        player.armor = armors[0];
+                        player.shield = shields[0];
+
+                        saveGame(player);
+                        playerNameInput = "";
+                        inputActive = false;
+                        selectedSaveSlot = 0;
+                        state = MENU;
+                    }
+                }
+                else if (event.keyboard.keycode >= ALLEGRO_KEY_A && event.keyboard.keycode <= ALLEGRO_KEY_Z) {
+                    if (playerNameInput.length() < 20) {
+                        char c = 'A' + (event.keyboard.keycode - ALLEGRO_KEY_A);
+                        if (!(event.keyboard.modifiers & ALLEGRO_KEYMOD_SHIFT)) {
+                            c = c - 'A' + 'a';
+                        }
+                        playerNameInput += c;
+                    }
+                }
+                else if (event.keyboard.keycode == ALLEGRO_KEY_SPACE) {
+                    if (playerNameInput.length() < 20) {
+                        playerNameInput += ' ';
+                    }
+                }
+            }
+        }
         else if (event.type == ALLEGRO_EVENT_MOUSE_BUTTON_DOWN) {
-            // TITLE SCREEN
+            int current_w = fullscreen ? screen_w : windowed_w;
+            int current_h = fullscreen ? screen_h : windowed_h;
+
+            // TITLE SCREEN - wybór nowa gra / wczytaj
             if (state == TITLE_SCREEN) {
-                Button startBtn = createButton(SCREEN_W / 2 - 150, SCREEN_H / 2, 300, 60,
-                    "START", al_map_rgb(50, 120, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 160, 70));
-                if (isMouseOverButton(startBtn, mouseX, mouseY)) {
-                    state = MENU;
+                Button newGameBtn = createButton(current_w / 2 - 150 * scale_x, 400 * scale_y, 300 * scale_x, 60 * scale_y,
+                    "NOWA GRA", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
+                Button loadGameBtn = createButton(current_w / 2 - 150 * scale_x, 500 * scale_y, 300 * scale_x, 60 * scale_y,
+                    "WCZYTAJ ZAPIS", al_map_rgb(50, 100, 200), al_map_rgb(255, 255, 255), al_map_rgb(70, 120, 220));
+
+                if (isMouseOverButton(newGameBtn, mouseX, mouseY)) {
+                    state = NOWA_GRA;
+                    playerNameInput = "";
+                    selectedSaveSlot = 0;
+                    inputActive = false;
+                }
+                else if (isMouseOverButton(loadGameBtn, mouseX, mouseY)) {
+                    state = TRAINING; // Używamy TRAINING jako stan wyboru zapisu do wczytania
+                }
+            }
+            // NOWA GRA - wybór miejsca i nazwa
+            else if (state == NOWA_GRA) {
+                // Przyciski wyboru miejsca zapisu
+                for (int i = 1; i <= 3; i++) {
+                    Button slotBtn = createButton(current_w / 2 - 150 * scale_x, (250 + i * 70) * scale_y, 300 * scale_x, 50 * scale_y,
+                        "", al_map_rgb(100, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 130));
+                    if (isMouseOverButton(slotBtn, mouseX, mouseY)) {
+                        selectedSaveSlot = i;
+                    }
+                }
+
+                // Pole tekstowe
+                Button inputBox = createButton(current_w / 2 - 200 * scale_x, 550 * scale_y, 400 * scale_x, 50 * scale_y,
+                    "", al_map_rgb(50, 50, 70), al_map_rgb(255, 255, 255), al_map_rgb(70, 70, 100));
+                if (isMouseOverButton(inputBox, mouseX, mouseY)) {
+                    inputActive = true;
+                }
+
+                // Przycisk powrotu
+                Button backBtn = createButton(current_w / 2 - 100 * scale_x, 650 * scale_y, 200 * scale_x, 50 * scale_y,
+                    "POWROT", al_map_rgb(100, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 130));
+                if (isMouseOverButton(backBtn, mouseX, mouseY)) {
+                    state = TITLE_SCREEN;
+                    playerNameInput = "";
+                    selectedSaveSlot = 0;
+                    inputActive = false;
+                }
+            }
+            // TRAINING - używamy jako stan wyboru zapisu do wczytania
+            else if (state == TRAINING) {
+                for (int i = 1; i <= 3; i++) {
+                    Button slotBtn = createButton(current_w / 2 - 200 * scale_x, (250 + i * 80) * scale_y, 400 * scale_x, 60 * scale_y,
+                        "", al_map_rgb(100, 100, 150), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 180));
+                    if (isMouseOverButton(slotBtn, mouseX, mouseY)) {
+                        if (saveGameExists(i)) {
+                            player.saveSlot = i;
+                            if (loadGame(player)) {
+                                state = MENU;
+                            }
+                        }
+                    }
+                }
+
+                Button backBtn = createButton(current_w / 2 - 100 * scale_x, 650 * scale_y, 200 * scale_x, 50 * scale_y,
+                    "POWROT", al_map_rgb(100, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 130));
+                if (isMouseOverButton(backBtn, mouseX, mouseY)) {
+                    state = TITLE_SCREEN;
                 }
             }
             // MENU
             else if (state == MENU) {
-                Button arenaBtn = createButton(SCREEN_W / 2 - 150, 300, 300, 60,
+                Button arenaBtn = createButton(current_w / 2 - 150 * scale_x, 350 * scale_y, 300 * scale_x, 60 * scale_y,
                     "ARENA", al_map_rgb(200, 50, 50), al_map_rgb(255, 255, 255), al_map_rgb(220, 70, 70));
-                Button shopBtn = createButton(SCREEN_W / 2 - 150, 400, 300, 60,
+                Button shopBtn = createButton(current_w / 2 - 150 * scale_x, 440 * scale_y, 300 * scale_x, 60 * scale_y,
                     "SKLEP", al_map_rgb(50, 50, 200), al_map_rgb(255, 255, 255), al_map_rgb(70, 70, 220));
-                Button statsBtn = createButton(SCREEN_W / 2 - 150, 500, 300, 60,
+                Button statsBtn = createButton(current_w / 2 - 150 * scale_x, 530 * scale_y, 300 * scale_x, 60 * scale_y,
                     "STATYSTYKI", al_map_rgb(150, 50, 150), al_map_rgb(255, 255, 255), al_map_rgb(170, 70, 170));
+                Button saveBtn = createButton(current_w / 2 - 150 * scale_x, 620 * scale_y, 300 * scale_x, 60 * scale_y,
+                    "ZAPISZ GRE", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
+                Button manageBtn = createButton(current_w / 2 - 150 * scale_x, 710 * scale_y, 300 * scale_x, 60 * scale_y,
+                    "ZARZADZAJ ZAPISAMI", al_map_rgb(150, 100, 50), al_map_rgb(255, 255, 255), al_map_rgb(180, 120, 70));
 
                 if (isMouseOverButton(arenaBtn, mouseX, mouseY)) {
                     state = ARENA;
@@ -1530,15 +1728,21 @@ int main() {
                 else if (isMouseOverButton(statsBtn, mouseX, mouseY)) {
                     state = STATYSTYKI;
                 }
+                else if (isMouseOverButton(saveBtn, mouseX, mouseY)) {
+                    saveGame(player);
+                }
+                else if (isMouseOverButton(manageBtn, mouseX, mouseY)) {
+                    state = ZARZAD;
+                }
             }
             // ARENA - wybor przeciwnika
             else if (state == ARENA) {
-                float btnW = 220;
-                float btnH = 50;
-                float startX = 50;
-                float startY = 150;
-                float gapX = 20;
-                float gapY = 15;
+                float btnW = 220 * scale_x;
+                float btnH = 50 * scale_y;
+                float startX = 50 * scale_x;
+                float startY = 150 * scale_y;
+                float gapX = 20 * scale_x;
+                float gapY = 15 * scale_y;
 
                 for (int i = 0; i < 30; i++) {
                     int row = i / 6;
@@ -1559,7 +1763,7 @@ int main() {
                     }
                 }
 
-                Button backBtn = createButton(SCREEN_W / 2 - 100, 850, 200, 50,
+                Button backBtn = createButton(current_w / 2 - 100 * scale_x, 850 * scale_y, 200 * scale_x, 50 * scale_y,
                     "POWROT", al_map_rgb(100, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 130));
                 if (isMouseOverButton(backBtn, mouseX, mouseY)) {
                     state = MENU;
@@ -1567,15 +1771,15 @@ int main() {
             }
             // WALKA
             else if (state == FIGHT && selectedEnemy >= 0) {
-                Button attackBtn = createButton(100, 700, 200, 60,
+                Button attackBtn = createButton(100 * scale_x, 700 * scale_y, 200 * scale_x, 60 * scale_y,
                     "ATAK (100%)", al_map_rgb(150, 50, 50), al_map_rgb(255, 255, 255), al_map_rgb(180, 70, 70));
-                Button heavyBtn = createButton(350, 700, 200, 60,
+                Button heavyBtn = createButton(350 * scale_x, 700 * scale_y, 200 * scale_x, 60 * scale_y,
                     "CIEZKI (180%)", al_map_rgb(200, 30, 30), al_map_rgb(255, 255, 255), al_map_rgb(220, 50, 50));
-                Button quickBtn = createButton(600, 700, 200, 60,
+                Button quickBtn = createButton(600 * scale_x, 700 * scale_y, 200 * scale_x, 60 * scale_y,
                     "SZYBKI (60%)", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
-                Button magicBtn = createButton(850, 700, 200, 60,
+                Button magicBtn = createButton(850 * scale_x, 700 * scale_y, 200 * scale_x, 60 * scale_y,
                     "MAGIA (120%)", al_map_rgb(100, 50, 200), al_map_rgb(255, 255, 255), al_map_rgb(120, 70, 220));
-                Button defenseBtn = createButton(1100, 700, 200, 60,
+                Button defenseBtn = createButton(1100 * scale_x, 700 * scale_y, 200 * scale_x, 60 * scale_y,
                     "OBRONA", al_map_rgb(50, 100, 150), al_map_rgb(255, 255, 255), al_map_rgb(70, 120, 180));
 
                 if (isMouseOverButton(attackBtn, mouseX, mouseY)) {
@@ -1657,19 +1861,13 @@ int main() {
             }
             // SKLEP
             else if (state == SHOP) {
-                Button weaponBtn = createButton(SCREEN_W / 2 - 150, 300, 300, 60,
-                    "BRONIE", al_map_rgb(150, 100, 50), al_map_rgb(255, 255, 255), al_map_rgb(180, 120, 70));
-                Button armorBtn = createButton(SCREEN_W / 2 - 150, 400, 300, 60,
-                    "ZBROJE", al_map_rgb(100, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 130));
-                Button shieldBtn = createButton(SCREEN_W / 2 - 150, 500, 300, 60,
-                    "TARCZE", al_map_rgb(80, 100, 150), al_map_rgb(255, 255, 255), al_map_rgb(100, 120, 180));
-                Button buyWeaponBtn = createButton(100, 700, 200, 50,
+                Button buyWeaponBtn = createButton(100 * scale_x, 700 * scale_y, 200 * scale_x, 50 * scale_y,
                     "KUP BRON", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
-                Button buyArmorBtn = createButton(350, 700, 200, 50,
+                Button buyArmorBtn = createButton(350 * scale_x, 700 * scale_y, 200 * scale_x, 50 * scale_y,
                     "KUP ZBROJE", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
-                Button buyShieldBtn = createButton(600, 700, 200, 50,
+                Button buyShieldBtn = createButton(600 * scale_x, 700 * scale_y, 200 * scale_x, 50 * scale_y,
                     "KUP TARCZE", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
-                Button backBtn = createButton(SCREEN_W / 2 - 100, 800, 200, 50,
+                Button backBtn = createButton(current_w / 2 - 100 * scale_x, 800 * scale_y, 200 * scale_x, 50 * scale_y,
                     "POWROT", al_map_rgb(100, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 130));
 
                 if (isMouseOverButton(buyWeaponBtn, mouseX, mouseY)) {
@@ -1701,7 +1899,25 @@ int main() {
             }
             // STATYSTYKI
             else if (state == STATYSTYKI) {
-                Button backBtn = createButton(SCREEN_W / 2 - 100, 800, 200, 50,
+                Button backBtn = createButton(current_w / 2 - 100 * scale_x, 800 * scale_y, 200 * scale_x, 50 * scale_y,
+                    "POWROT", al_map_rgb(100, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 130));
+                if (isMouseOverButton(backBtn, mouseX, mouseY)) {
+                    state = MENU;
+                }
+            }
+            // ZARZĄDZANIE ZAPISAMI
+            else if (state == ZARZAD) {
+                for (int i = 1; i <= 3; i++) {
+                    Button deleteBtn = createButton(current_w / 2 + 220 * scale_x, (230 + i * 90) * scale_y, 120 * scale_x, 50 * scale_y,
+                        "USUN", al_map_rgb(200, 50, 50), al_map_rgb(255, 255, 255), al_map_rgb(220, 70, 70));
+                    if (isMouseOverButton(deleteBtn, mouseX, mouseY)) {
+                        if (saveGameExists(i)) {
+                            deleteSave(i);
+                        }
+                    }
+                }
+
+                Button backBtn = createButton(current_w / 2 - 100 * scale_x, 700 * scale_y, 200 * scale_x, 50 * scale_y,
                     "POWROT", al_map_rgb(100, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 130));
                 if (isMouseOverButton(backBtn, mouseX, mouseY)) {
                     state = MENU;
@@ -1711,60 +1927,204 @@ int main() {
 
         if (redraw && al_is_event_queue_empty(queue)) {
             redraw = false;
+
+            int current_w = fullscreen ? screen_w : windowed_w;
+            int current_h = fullscreen ? screen_h : windowed_h;
+
             al_clear_to_color(al_map_rgb(20, 30, 50));
 
             // TITLE SCREEN
             if (state == TITLE_SCREEN) {
-                al_draw_text(titleFont, al_map_rgb(255, 215, 0), SCREEN_W / 2, 200,
+                al_draw_text(titleFont, al_map_rgb(255, 215, 0), current_w / 2, 200 * scale_y,
                     ALLEGRO_ALIGN_CENTRE, "MISTRZOWIE OSTRZA");
-                Button startBtn = createButton(SCREEN_W / 2 - 150, SCREEN_H / 2, 300, 60,
-                    "START", al_map_rgb(50, 120, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 160, 70));
-                startBtn.isHovered = isMouseOverButton(startBtn, mouseX, mouseY);
-                drawButton(startBtn, font);
+
+                Button newGameBtn = createButton(current_w / 2 - 150 * scale_x, 400 * scale_y, 300 * scale_x, 60 * scale_y,
+                    "NOWA GRA", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
+                Button loadGameBtn = createButton(current_w / 2 - 150 * scale_x, 500 * scale_y, 300 * scale_x, 60 * scale_y,
+                    "WCZYTAJ ZAPIS", al_map_rgb(50, 100, 200), al_map_rgb(255, 255, 255), al_map_rgb(70, 120, 220));
+
+                newGameBtn.isHovered = isMouseOverButton(newGameBtn, mouseX, mouseY);
+                loadGameBtn.isHovered = isMouseOverButton(loadGameBtn, mouseX, mouseY);
+
+                drawButton(newGameBtn, font);
+                drawButton(loadGameBtn, font);
+
+                al_draw_text(smallFont, al_map_rgb(150, 150, 150), current_w / 2, current_h - 50 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, "Nacisnij F11 aby przelaczyc tryb pelnoekranowy");
+            }
+            // NOWA GRA - wybór miejsca i wpisanie nazwy
+            else if (state == NOWA_GRA) {
+                al_draw_text(titleFont, al_map_rgb(255, 215, 0), current_w / 2, 100 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, "NOWA GRA");
+
+                al_draw_text(font, al_map_rgb(255, 255, 255), current_w / 2, 200 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, "Wybierz miejsce zapisu:");
+
+                // Przyciski wyboru miejsca
+                for (int i = 1; i <= 3; i++) {
+                    Button slotBtn = createButton(current_w / 2 - 150 * scale_x, (250 + i * 70) * scale_y, 300 * scale_x, 50 * scale_y,
+                        "", al_map_rgb(100, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 130));
+
+                    if (selectedSaveSlot == i) {
+                        slotBtn.color = al_map_rgb(50, 150, 50);
+                        slotBtn.hoverColor = al_map_rgb(70, 180, 70);
+                    }
+
+                    slotBtn.isHovered = isMouseOverButton(slotBtn, mouseX, mouseY);
+                    drawButton(slotBtn, font);
+
+                    char slotText[128];
+                    if (saveGameExists(i)) {
+                        ifstream file(getSaveFileName(i));
+                        string name;
+                        int level;
+                        getline(file, name);
+                        file >> level;
+                        file.close();
+                        sprintf(slotText, "Miejsce %d - %s (Lvl %d)", i, name.c_str(), level);
+                    }
+                    else {
+                        sprintf(slotText, "Miejsce %d - [PUSTE]", i);
+                    }
+
+                    al_draw_text(smallFont, al_map_rgb(255, 255, 255),
+                        current_w / 2, (250 + i * 70 + 15) * scale_y, ALLEGRO_ALIGN_CENTRE, slotText);
+                }
+
+                // Pole tekstowe
+                al_draw_text(font, al_map_rgb(255, 255, 255), current_w / 2, 520 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, "Wpisz imie postaci:");
+                drawTextInput(current_w / 2 - 200 * scale_x, 550 * scale_y, 400 * scale_x, 50 * scale_y,
+                    playerNameInput, inputActive, font);
+
+                // Przycisk powrotu
+                Button backBtn = createButton(current_w / 2 - 100 * scale_x, 650 * scale_y, 200 * scale_x, 50 * scale_y,
+                    "POWROT", al_map_rgb(100, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 130));
+                backBtn.isHovered = isMouseOverButton(backBtn, mouseX, mouseY);
+                drawButton(backBtn, font);
+
+                if (selectedSaveSlot > 0 && !playerNameInput.empty()) {
+                    al_draw_text(smallFont, al_map_rgb(100, 255, 100), current_w / 2, 720 * scale_y,
+                        ALLEGRO_ALIGN_CENTRE, "Nacisnij ENTER aby rozpoczac gre");
+                }
+            }
+            // TRAINING - stan wyboru zapisu do wczytania
+            else if (state == TRAINING) {
+                al_draw_text(titleFont, al_map_rgb(100, 150, 255), current_w / 2, 100 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, "WCZYTAJ ZAPIS");
+
+                al_draw_text(font, al_map_rgb(255, 255, 255), current_w / 2, 200 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, "Wybierz zapis do wczytania:");
+
+                for (int i = 1; i <= 3; i++) {
+                    Button slotBtn = createButton(current_w / 2 - 200 * scale_x, (250 + i * 80) * scale_y, 400 * scale_x, 60 * scale_y,
+                        "", al_map_rgb(100, 100, 150), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 180));
+                    slotBtn.isHovered = isMouseOverButton(slotBtn, mouseX, mouseY);
+                    drawButton(slotBtn, font);
+
+                    char slotText[128];
+                    if (saveGameExists(i)) {
+                        ifstream file(getSaveFileName(i));
+                        string name;
+                        int level, gold;
+                        getline(file, name);
+                        file >> level;
+                        file >> gold; // pomijamy exp
+                        file >> gold; // pomijamy expToNext
+                        file >> gold; // teraz gold
+                        file.close();
+                        sprintf(slotText, "Miejsce %d - %s", i, name.c_str());
+                        al_draw_text(font, al_map_rgb(255, 255, 255),
+                            current_w / 2, (255 + i * 80) * scale_y, ALLEGRO_ALIGN_CENTRE, slotText);
+                        sprintf(slotText, "Poziom %d | Zloto: %d", level, gold);
+                        al_draw_text(smallFont, al_map_rgb(200, 200, 200),
+                            current_w / 2, (280 + i * 80) * scale_y, ALLEGRO_ALIGN_CENTRE, slotText);
+                    }
+                    else {
+                        sprintf(slotText, "Miejsce %d - [PUSTE]", i);
+                        al_draw_text(font, al_map_rgb(150, 150, 150),
+                            current_w / 2, (265 + i * 80) * scale_y, ALLEGRO_ALIGN_CENTRE, slotText);
+                    }
+                }
+
+                Button backBtn = createButton(current_w / 2 - 100 * scale_x, 650 * scale_y, 200 * scale_x, 50 * scale_y,
+                    "POWROT", al_map_rgb(100, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 130));
+                backBtn.isHovered = isMouseOverButton(backBtn, mouseX, mouseY);
+                drawButton(backBtn, font);
             }
             // MENU
             else if (state == MENU) {
-                al_draw_text(titleFont, al_map_rgb(255, 215, 0), SCREEN_W / 2, 100,
+                al_draw_text(titleFont, al_map_rgb(255, 215, 0), current_w / 2, 50 * scale_y,
                     ALLEGRO_ALIGN_CENTRE, "MENU GLOWNE");
 
-                char statsText[256];
-                sprintf(statsText, "%s | Poziom: %d | Zloto: %d | HP: %d/%d",
-                    player.name.c_str(), player.level, player.gold, player.currentHp, player.maxHp);
-                al_draw_text(font, al_map_rgb(255, 255, 255), SCREEN_W / 2, 200,
+                // Statystyki gracza - zawsze widoczne
+                char statsText[512];
+                sprintf(statsText, "%s | Poziom: %d | Zloto: %d",
+                    player.name.c_str(), player.level, player.gold);
+                al_draw_text(font, al_map_rgb(255, 255, 255), current_w / 2, 150 * scale_y,
                     ALLEGRO_ALIGN_CENTRE, statsText);
 
-                Button arenaBtn = createButton(SCREEN_W / 2 - 150, 300, 300, 60,
+                sprintf(statsText, "HP: %d/%d | Energia: %d/%d | EXP: %d/%d",
+                    player.currentHp, player.maxHp, player.energy, player.maxEnergy, player.exp, player.expToNext);
+                al_draw_text(smallFont, al_map_rgb(200, 200, 200), current_w / 2, 180 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, statsText);
+
+                sprintf(statsText, "Zwyciestwa: %d | Porazki: %d | Punkty umiejetnosci: %d",
+                    player.wins, player.losses, player.skillPoints);
+                al_draw_text(smallFont, al_map_rgb(200, 200, 200), current_w / 2, 210 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, statsText);
+
+                // Ekwipunek
+                sprintf(statsText, "Bron: %s (+%d) | Zbroja: %s (+%d) | Tarcza: %s (+%d)",
+                    player.weapon.name.c_str(), player.weapon.value,
+                    player.armor.name.c_str(), player.armor.defenseValue,
+                    player.shield.name.c_str(), player.shield.defenseValue);
+                al_draw_text(smallFont, al_map_rgb(180, 180, 255), current_w / 2, 250 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, statsText);
+
+                Button arenaBtn = createButton(current_w / 2 - 150 * scale_x, 350 * scale_y, 300 * scale_x, 60 * scale_y,
                     "ARENA", al_map_rgb(200, 50, 50), al_map_rgb(255, 255, 255), al_map_rgb(220, 70, 70));
-                Button shopBtn = createButton(SCREEN_W / 2 - 150, 400, 300, 60,
+                Button shopBtn = createButton(current_w / 2 - 150 * scale_x, 440 * scale_y, 300 * scale_x, 60 * scale_y,
                     "SKLEP", al_map_rgb(50, 50, 200), al_map_rgb(255, 255, 255), al_map_rgb(70, 70, 220));
-                Button statsBtn = createButton(SCREEN_W / 2 - 150, 500, 300, 60,
+                Button statsBtn = createButton(current_w / 2 - 150 * scale_x, 530 * scale_y, 300 * scale_x, 60 * scale_y,
                     "STATYSTYKI", al_map_rgb(150, 50, 150), al_map_rgb(255, 255, 255), al_map_rgb(170, 70, 170));
+                Button saveBtn = createButton(current_w / 2 - 150 * scale_x, 620 * scale_y, 300 * scale_x, 60 * scale_y,
+                    "ZAPISZ GRE", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
+                Button manageBtn = createButton(current_w / 2 - 150 * scale_x, 710 * scale_y, 300 * scale_x, 60 * scale_y,
+                    "ZARZADZAJ ZAPISAMI", al_map_rgb(150, 100, 50), al_map_rgb(255, 255, 255), al_map_rgb(180, 120, 70));
 
                 arenaBtn.isHovered = isMouseOverButton(arenaBtn, mouseX, mouseY);
                 shopBtn.isHovered = isMouseOverButton(shopBtn, mouseX, mouseY);
                 statsBtn.isHovered = isMouseOverButton(statsBtn, mouseX, mouseY);
+                saveBtn.isHovered = isMouseOverButton(saveBtn, mouseX, mouseY);
+                manageBtn.isHovered = isMouseOverButton(manageBtn, mouseX, mouseY);
 
                 drawButton(arenaBtn, font);
                 drawButton(shopBtn, font);
                 drawButton(statsBtn, font);
+                drawButton(saveBtn, font);
+                drawButton(manageBtn, smallFont);
+
+                al_draw_text(smallFont, al_map_rgb(150, 150, 150), current_w / 2, current_h - 50 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, "F11 - Tryb pelnoekranowy");
             }
             // ARENA
             else if (state == ARENA) {
-                al_draw_text(titleFont, al_map_rgb(255, 100, 100), SCREEN_W / 2, 30,
+                al_draw_text(titleFont, al_map_rgb(255, 100, 100), current_w / 2, 30 * scale_y,
                     ALLEGRO_ALIGN_CENTRE, "ARENA WALKI");
 
                 char statsText[256];
                 sprintf(statsText, "Poziom: %d | Zloto: %d | Zwyciestwa: %d | Porazki: %d",
                     player.level, player.gold, player.wins, player.losses);
-                al_draw_text(font, al_map_rgb(255, 255, 255), SCREEN_W / 2, 100,
+                al_draw_text(font, al_map_rgb(255, 255, 255), current_w / 2, 100 * scale_y,
                     ALLEGRO_ALIGN_CENTRE, statsText);
 
-                float btnW = 220;
-                float btnH = 50;
-                float startX = 50;
-                float startY = 150;
-                float gapX = 20;
-                float gapY = 15;
+                float btnW = 220 * scale_x;
+                float btnH = 50 * scale_y;
+                float startX = 50 * scale_x;
+                float startY = 150 * scale_y;
+                float gapX = 20 * scale_x;
+                float gapY = 15 * scale_y;
 
                 for (int i = 0; i < 30; i++) {
                     int row = i / 6;
@@ -1779,14 +2139,14 @@ int main() {
 
                     char text[128];
                     sprintf(text, "%d. %s", i + 1, enemies[i].name.c_str());
-                    al_draw_text(smallFont, al_map_rgb(255, 255, 255), x + btnW / 2, y + 5,
+                    al_draw_text(smallFont, al_map_rgb(255, 255, 255), x + btnW / 2, y + 5 * scale_y,
                         ALLEGRO_ALIGN_CENTRE, text);
                     sprintf(text, "Lvl %d | HP: %d", enemies[i].level, enemies[i].maxHp);
-                    al_draw_text(smallFont, al_map_rgb(200, 200, 200), x + btnW / 2, y + 28,
+                    al_draw_text(smallFont, al_map_rgb(200, 200, 200), x + btnW / 2, y + 28 * scale_y,
                         ALLEGRO_ALIGN_CENTRE, text);
                 }
 
-                Button backBtn = createButton(SCREEN_W / 2 - 100, 850, 200, 50,
+                Button backBtn = createButton(current_w / 2 - 100 * scale_x, 850 * scale_y, 200 * scale_x, 50 * scale_y,
                     "POWROT", al_map_rgb(100, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 130));
                 backBtn.isHovered = isMouseOverButton(backBtn, mouseX, mouseY);
                 drawButton(backBtn, font);
@@ -1795,37 +2155,37 @@ int main() {
             else if (state == FIGHT && selectedEnemy >= 0) {
                 Enemy& enemy = enemies[selectedEnemy];
 
-                al_draw_text(titleFont, al_map_rgb(255, 100, 100), SCREEN_W / 2, 30,
+                al_draw_text(titleFont, al_map_rgb(255, 100, 100), current_w / 2, 30 * scale_y,
                     ALLEGRO_ALIGN_CENTRE, "WALKA!");
 
                 // Rysuj postać (zielony kwadrat)
-                drawPlayer(200, 300, 150);
-                al_draw_text(font, al_map_rgb(255, 255, 255), 275, 470,
+                drawPlayer(200 * scale_x, 300 * scale_y, 150 * scale_x);
+                al_draw_text(font, al_map_rgb(255, 255, 255), 275 * scale_x, 470 * scale_y,
                     ALLEGRO_ALIGN_CENTRE, player.name.c_str());
-                drawHealthBar(150, 500, 250, 30, player.currentHp, player.maxHp, al_map_rgb(50, 200, 50));
+                drawHealthBar(150 * scale_x, 500 * scale_y, 250 * scale_x, 30 * scale_y, player.currentHp, player.maxHp, al_map_rgb(50, 200, 50));
 
                 // Rysuj przeciwnika (czerwony kwadrat)
-                drawEnemy(1150, 300, 150);
-                al_draw_text(font, al_map_rgb(255, 255, 255), 1225, 470,
+                drawEnemy(1150 * scale_x, 300 * scale_y, 150 * scale_x);
+                al_draw_text(font, al_map_rgb(255, 255, 255), 1225 * scale_x, 470 * scale_y,
                     ALLEGRO_ALIGN_CENTRE, enemy.name.c_str());
-                drawHealthBar(1100, 500, 250, 30, enemy.hp, enemy.maxHp, al_map_rgb(200, 50, 50));
+                drawHealthBar(1100 * scale_x, 500 * scale_y, 250 * scale_x, 30 * scale_y, enemy.hp, enemy.maxHp, al_map_rgb(200, 50, 50));
 
                 // Combo
                 char comboText[64];
                 sprintf(comboText, "COMBO: %dx", combo);
-                al_draw_text(font, al_map_rgb(255, 255, 0), SCREEN_W / 2, 250,
+                al_draw_text(font, al_map_rgb(255, 255, 0), current_w / 2, 250 * scale_y,
                     ALLEGRO_ALIGN_CENTRE, comboText);
 
                 // Przyciski ataku
-                Button attackBtn = createButton(100, 700, 200, 60,
+                Button attackBtn = createButton(100 * scale_x, 700 * scale_y, 200 * scale_x, 60 * scale_y,
                     "ATAK (100%)", al_map_rgb(150, 50, 50), al_map_rgb(255, 255, 255), al_map_rgb(180, 70, 70));
-                Button heavyBtn = createButton(350, 700, 200, 60,
+                Button heavyBtn = createButton(350 * scale_x, 700 * scale_y, 200 * scale_x, 60 * scale_y,
                     "CIEZKI (180%)", al_map_rgb(200, 30, 30), al_map_rgb(255, 255, 255), al_map_rgb(220, 50, 50));
-                Button quickBtn = createButton(600, 700, 200, 60,
+                Button quickBtn = createButton(600 * scale_x, 700 * scale_y, 200 * scale_x, 60 * scale_y,
                     "SZYBKI (60%)", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
-                Button magicBtn = createButton(850, 700, 200, 60,
+                Button magicBtn = createButton(850 * scale_x, 700 * scale_y, 200 * scale_x, 60 * scale_y,
                     "MAGIA (120%)", al_map_rgb(100, 50, 200), al_map_rgb(255, 255, 255), al_map_rgb(120, 70, 220));
-                Button defenseBtn = createButton(1100, 700, 200, 60,
+                Button defenseBtn = createButton(1100 * scale_x, 700 * scale_y, 200 * scale_x, 60 * scale_y,
                     "OBRONA", al_map_rgb(50, 100, 150), al_map_rgb(255, 255, 255), al_map_rgb(70, 120, 180));
 
                 attackBtn.isHovered = isMouseOverButton(attackBtn, mouseX, mouseY);
@@ -1842,58 +2202,67 @@ int main() {
             }
             // SKLEP
             else if (state == SHOP) {
-                al_draw_text(titleFont, al_map_rgb(100, 150, 255), SCREEN_W / 2, 50,
+                al_draw_text(titleFont, al_map_rgb(100, 150, 255), current_w / 2, 50 * scale_y,
                     ALLEGRO_ALIGN_CENTRE, "SKLEP");
 
                 char goldText[64];
                 sprintf(goldText, "Zloto: %d", player.gold);
-                al_draw_text(font, al_map_rgb(255, 215, 0), SCREEN_W / 2, 150,
+                al_draw_text(font, al_map_rgb(255, 215, 0), current_w / 2, 150 * scale_y,
                     ALLEGRO_ALIGN_CENTRE, goldText);
 
                 // Wyświetl ekwipunek
                 char equipText[256];
                 sprintf(equipText, "Bron: %s (+%d DMG)", player.weapon.name.c_str(), player.weapon.value);
-                al_draw_text(font, al_map_rgb(255, 255, 255), SCREEN_W / 2, 250,
+                al_draw_text(font, al_map_rgb(255, 255, 255), current_w / 2, 250 * scale_y,
                     ALLEGRO_ALIGN_CENTRE, equipText);
                 sprintf(equipText, "Zbroja: %s (+%d DEF)", player.armor.name.c_str(), player.armor.defenseValue);
-                al_draw_text(font, al_map_rgb(255, 255, 255), SCREEN_W / 2, 300,
+                al_draw_text(font, al_map_rgb(255, 255, 255), current_w / 2, 300 * scale_y,
                     ALLEGRO_ALIGN_CENTRE, equipText);
                 sprintf(equipText, "Tarcza: %s (+%d DEF)", player.shield.name.c_str(), player.shield.defenseValue);
-                al_draw_text(font, al_map_rgb(255, 255, 255), SCREEN_W / 2, 350,
+                al_draw_text(font, al_map_rgb(255, 255, 255), current_w / 2, 350 * scale_y,
                     ALLEGRO_ALIGN_CENTRE, equipText);
 
                 // Dostępne ulepszenia
-                al_draw_text(font, al_map_rgb(200, 200, 200), SCREEN_W / 2, 450,
+                al_draw_text(font, al_map_rgb(200, 200, 200), current_w / 2, 450 * scale_y,
                     ALLEGRO_ALIGN_CENTRE, "Dostepne ulepszenia:");
 
                 int nextWeaponLvl = player.weapon.level + 1;
                 if (nextWeaponLvl < (int)weapons.size()) {
                     sprintf(equipText, "Bron: %s (+%d DMG) - %d zlota",
                         weapons[nextWeaponLvl].name.c_str(), weapons[nextWeaponLvl].value, weapons[nextWeaponLvl].price);
-                    al_draw_text(smallFont, al_map_rgb(200, 200, 200), 100, 520, 0, equipText);
+                    al_draw_text(smallFont, al_map_rgb(200, 200, 200), 100 * scale_x, 520 * scale_y, 0, equipText);
+                }
+                else {
+                    al_draw_text(smallFont, al_map_rgb(150, 150, 150), 100 * scale_x, 520 * scale_y, 0, "Bron: MAX");
                 }
 
                 int nextArmorLvl = player.armor.level + 1;
                 if (nextArmorLvl < (int)armors.size()) {
                     sprintf(equipText, "Zbroja: %s (+%d DEF) - %d zlota",
                         armors[nextArmorLvl].name.c_str(), armors[nextArmorLvl].defenseValue, armors[nextArmorLvl].price);
-                    al_draw_text(smallFont, al_map_rgb(200, 200, 200), 350, 520, 0, equipText);
+                    al_draw_text(smallFont, al_map_rgb(200, 200, 200), 350 * scale_x, 520 * scale_y, 0, equipText);
+                }
+                else {
+                    al_draw_text(smallFont, al_map_rgb(150, 150, 150), 350 * scale_x, 520 * scale_y, 0, "Zbroja: MAX");
                 }
 
                 int nextShieldLvl = player.shield.level + 1;
                 if (nextShieldLvl < (int)shields.size()) {
                     sprintf(equipText, "Tarcza: %s (+%d DEF) - %d zlota",
                         shields[nextShieldLvl].name.c_str(), shields[nextShieldLvl].defenseValue, shields[nextShieldLvl].price);
-                    al_draw_text(smallFont, al_map_rgb(200, 200, 200), 600, 520, 0, equipText);
+                    al_draw_text(smallFont, al_map_rgb(200, 200, 200), 600 * scale_x, 520 * scale_y, 0, equipText);
+                }
+                else {
+                    al_draw_text(smallFont, al_map_rgb(150, 150, 150), 600 * scale_x, 520 * scale_y, 0, "Tarcza: MAX");
                 }
 
-                Button buyWeaponBtn = createButton(100, 700, 200, 50,
+                Button buyWeaponBtn = createButton(100 * scale_x, 700 * scale_y, 200 * scale_x, 50 * scale_y,
                     "KUP BRON", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
-                Button buyArmorBtn = createButton(350, 700, 200, 50,
+                Button buyArmorBtn = createButton(350 * scale_x, 700 * scale_y, 200 * scale_x, 50 * scale_y,
                     "KUP ZBROJE", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
-                Button buyShieldBtn = createButton(600, 700, 200, 50,
+                Button buyShieldBtn = createButton(600 * scale_x, 700 * scale_y, 200 * scale_x, 50 * scale_y,
                     "KUP TARCZE", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
-                Button backBtn = createButton(SCREEN_W / 2 - 100, 800, 200, 50,
+                Button backBtn = createButton(current_w / 2 - 100 * scale_x, 800 * scale_y, 200 * scale_x, 50 * scale_y,
                     "POWROT", al_map_rgb(100, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 130));
 
                 buyWeaponBtn.isHovered = isMouseOverButton(buyWeaponBtn, mouseX, mouseY);
@@ -1908,36 +2277,109 @@ int main() {
             }
             // STATYSTYKI
             else if (state == STATYSTYKI) {
-                al_draw_text(titleFont, al_map_rgb(200, 100, 200), SCREEN_W / 2, 50,
+                al_draw_text(titleFont, al_map_rgb(200, 100, 200), current_w / 2, 50 * scale_y,
                     ALLEGRO_ALIGN_CENTRE, "STATYSTYKI");
 
                 char statText[256];
                 sprintf(statText, "Imie: %s", player.name.c_str());
-                al_draw_text(font, al_map_rgb(255, 255, 255), SCREEN_W / 2, 200, ALLEGRO_ALIGN_CENTRE, statText);
+                al_draw_text(font, al_map_rgb(255, 255, 255), current_w / 2, 200 * scale_y, ALLEGRO_ALIGN_CENTRE, statText);
                 sprintf(statText, "Poziom: %d | EXP: %d/%d", player.level, player.exp, player.expToNext);
-                al_draw_text(font, al_map_rgb(255, 255, 255), SCREEN_W / 2, 250, ALLEGRO_ALIGN_CENTRE, statText);
+                al_draw_text(font, al_map_rgb(255, 255, 255), current_w / 2, 250 * scale_y, ALLEGRO_ALIGN_CENTRE, statText);
                 sprintf(statText, "HP: %d/%d | Energia: %d/%d", player.currentHp, player.maxHp, player.energy, player.maxEnergy);
-                al_draw_text(font, al_map_rgb(255, 255, 255), SCREEN_W / 2, 300, ALLEGRO_ALIGN_CENTRE, statText);
+                al_draw_text(font, al_map_rgb(255, 255, 255), current_w / 2, 300 * scale_y, ALLEGRO_ALIGN_CENTRE, statText);
                 sprintf(statText, "Zloto: %d", player.gold);
-                al_draw_text(font, al_map_rgb(255, 215, 0), SCREEN_W / 2, 350, ALLEGRO_ALIGN_CENTRE, statText);
+                al_draw_text(font, al_map_rgb(255, 215, 0), current_w / 2, 350 * scale_y, ALLEGRO_ALIGN_CENTRE, statText);
 
                 sprintf(statText, "Sila: %d | Zrecznosc: %d", player.stats.strength, player.stats.agility);
-                al_draw_text(font, al_map_rgb(200, 200, 200), SCREEN_W / 2, 420, ALLEGRO_ALIGN_CENTRE, statText);
+                al_draw_text(font, al_map_rgb(200, 200, 200), current_w / 2, 420 * scale_y, ALLEGRO_ALIGN_CENTRE, statText);
                 sprintf(statText, "Witalnosc: %d | Magia: %d", player.stats.vitality, player.stats.magic);
-                al_draw_text(font, al_map_rgb(200, 200, 200), SCREEN_W / 2, 470, ALLEGRO_ALIGN_CENTRE, statText);
+                al_draw_text(font, al_map_rgb(200, 200, 200), current_w / 2, 470 * scale_y, ALLEGRO_ALIGN_CENTRE, statText);
 
                 sprintf(statText, "Zwyciestwa: %d | Porazki: %d", player.wins, player.losses);
-                al_draw_text(font, al_map_rgb(200, 200, 200), SCREEN_W / 2, 540, ALLEGRO_ALIGN_CENTRE, statText);
+                al_draw_text(font, al_map_rgb(200, 200, 200), current_w / 2, 540 * scale_y, ALLEGRO_ALIGN_CENTRE, statText);
 
                 sprintf(statText, "Obrazenia: x%.2f | Obrona: x%.2f", player.stats.strengthMult, player.stats.defenseMult);
-                al_draw_text(font, al_map_rgb(150, 150, 255), SCREEN_W / 2, 610, ALLEGRO_ALIGN_CENTRE, statText);
+                al_draw_text(font, al_map_rgb(150, 150, 255), current_w / 2, 610 * scale_y, ALLEGRO_ALIGN_CENTRE, statText);
                 sprintf(statText, "Zdrowie: x%.2f | Magia: x%.2f", player.stats.healthMult, player.stats.magicMult);
-                al_draw_text(font, al_map_rgb(150, 150, 255), SCREEN_W / 2, 660, ALLEGRO_ALIGN_CENTRE, statText);
+                al_draw_text(font, al_map_rgb(150, 150, 255), current_w / 2, 660 * scale_y, ALLEGRO_ALIGN_CENTRE, statText);
 
-                Button backBtn = createButton(SCREEN_W / 2 - 100, 800, 200, 50,
+                Button backBtn = createButton(current_w / 2 - 100 * scale_x, 800 * scale_y, 200 * scale_x, 50 * scale_y,
                     "POWROT", al_map_rgb(100, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 130));
                 backBtn.isHovered = isMouseOverButton(backBtn, mouseX, mouseY);
                 drawButton(backBtn, font);
+            }
+            // ZARZĄDZANIE ZAPISAMI
+            else if (state == ZARZAD) {
+                al_draw_text(titleFont, al_map_rgb(200, 150, 50), current_w / 2, 50 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, "ZARZADZANIE ZAPISAMI");
+
+                al_draw_text(font, al_map_rgb(255, 255, 255), current_w / 2, 150 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, "Dostepne zapisy:");
+
+                for (int i = 1; i <= 3; i++) {
+                    char slotText[256];
+                    if (saveGameExists(i)) {
+                        ifstream file(getSaveFileName(i));
+                        string name;
+                        int level, gold;
+                        getline(file, name);
+                        file >> level;
+                        file >> gold; // pomijamy exp
+                        file >> gold; // pomijamy expToNext
+                        file >> gold; // teraz gold
+                        file.close();
+
+                        sprintf(slotText, "Miejsce %d: %s", i, name.c_str());
+                        al_draw_text(font, al_map_rgb(255, 255, 255),
+                            current_w / 2 - 200 * scale_x, (230 + i * 90) * scale_y, 0, slotText);
+                        sprintf(slotText, "Poziom %d | Zloto: %d", level, gold);
+                        al_draw_text(smallFont, al_map_rgb(200, 200, 200),
+                            current_w / 2 - 200 * scale_x, (260 + i * 90) * scale_y, 0, slotText);
+
+                        Button deleteBtn = createButton(current_w / 2 + 220 * scale_x, (230 + i * 90) * scale_y, 120 * scale_x, 50 * scale_y,
+                            "USUN", al_map_rgb(200, 50, 50), al_map_rgb(255, 255, 255), al_map_rgb(220, 70, 70));
+                        deleteBtn.isHovered = isMouseOverButton(deleteBtn, mouseX, mouseY);
+                        drawButton(deleteBtn, smallFont);
+                    }
+                    else {
+                        sprintf(slotText, "Miejsce %d: [PUSTE]", i);
+                        al_draw_text(font, al_map_rgb(150, 150, 150),
+                            current_w / 2 - 200 * scale_x, (240 + i * 90) * scale_y, 0, slotText);
+                    }
+                }
+
+                Button backBtn = createButton(current_w / 2 - 100 * scale_x, 700 * scale_y, 200 * scale_x, 50 * scale_y,
+                    "POWROT", al_map_rgb(100, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 130));
+                backBtn.isHovered = isMouseOverButton(backBtn, mouseX, mouseY);
+                drawButton(backBtn, font);
+            }
+
+            // Powiadomienie o awansie poziomu
+            if (showLevelUp) {
+                float alpha = 1.0f;
+                if (levelUpTimer > 2.5) {
+                    alpha = 1.0f - (levelUpTimer - 2.5f) / 0.5f;
+                }
+
+                int boxW = 600 * scale_x;
+                int boxH = 200 * scale_y;
+                int boxX = current_w / 2 - boxW / 2;
+                int boxY = current_h / 2 - boxH / 2;
+
+                al_draw_filled_rectangle(boxX, boxY, boxX + boxW, boxY + boxH,
+                    al_map_rgba(50, 50, 50, (int)(200 * alpha)));
+                al_draw_rectangle(boxX, boxY, boxX + boxW, boxY + boxH,
+                    al_map_rgba(255, 215, 0, (int)(255 * alpha)), 4);
+
+                al_draw_text(titleFont, al_map_rgba(255, 215, 0, (int)(255 * alpha)),
+                    current_w / 2, boxY + 30 * scale_y, ALLEGRO_ALIGN_CENTRE, "AWANS POZIOMU!");
+
+                char levelText[128];
+                sprintf(levelText, "Nowy poziom: %d", player.level);
+                al_draw_text(font, al_map_rgba(255, 255, 255, (int)(255 * alpha)),
+                    current_w / 2, boxY + 100 * scale_y, ALLEGRO_ALIGN_CENTRE, levelText);
+                al_draw_text(font, al_map_rgba(200, 200, 255, (int)(255 * alpha)),
+                    current_w / 2, boxY + 140 * scale_y, ALLEGRO_ALIGN_CENTRE, "+2 Punkty umiejetnosci");
             }
 
             al_flip_display();
