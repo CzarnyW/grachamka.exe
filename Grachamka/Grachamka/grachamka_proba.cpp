@@ -41,6 +41,18 @@ enum GameState {
     STATYSTYKI,
     ZARZAD,
     NOWA_GRA,
+    ARENA_TRENINGOWA,
+    MINIGRA_SILA,
+    MINIGRA_MAGIA,
+    MINIGRA_AGILITY,
+    MINIGRA_WITALNOSC,
+    LEVEL_UP_SCREEN
+};
+
+struct Ball {
+    float x, y, speed;
+    bool isGolden;
+    bool active;
 };
 
 struct Stats {
@@ -458,25 +470,16 @@ int calculateDefense(const Player& player) {
     return def;
 }
 
-void levelUp(Player& player) {
+void levelUp(Player& player)
+{
     player.level++;
-    player.skillPoints += 2;
+    player.skillPoints += 20; // Teraz 20 punktów za poziom
+    player.gold += 100 * player.level; // Nagroda złota: 100 * poziom
     player.expToNext = static_cast<int>(player.expToNext * 1.5);
     player.maxHp = calculateMaxHp(player);
     player.currentHp = player.maxHp;
     player.energy = player.maxEnergy;
-
-    clearScreen();
-    cout << "\n\n";
-    cout << "    -----------------------------------------\n";
-    cout << "    !                                       !\n";
-    cout << "    !        ★ AWANS POZIOMU! ★            !\n";
-    cout << "    !                                       !\n";
-    cout << "    !     Nowy poziom: " << setw(2) << player.level << "                !\n";
-    cout << "    !     Otrzymujesz 2 punkty umiejetnosci !\n";
-    cout << "    !                                       !\n";
-    cout << "    -----------------------------------------\n\n";
-    pause();
+    // Nie wyświetlamy nic w konsoli - będzie obsłużone graficznie
 }
 
 void gainExp(Player& player, int exp) {
@@ -1350,7 +1353,6 @@ void upgradeStats(Player& player) {
         }
     }
 }
-
 void drawPlayer(float x, float y, float size) {
     al_draw_filled_rectangle(x, y, x + size, y + size, al_map_rgb(50, 200, 50));
     al_draw_rectangle(x, y, x + size, y + size, al_map_rgb(255, 255, 255), 2);
@@ -1380,6 +1382,54 @@ void drawTextInput(float x, float y, float width, float height, const string& te
     }
 
     al_draw_text(font, al_map_rgb(255, 255, 255), x + 10, y + height / 2 - al_get_font_line_height(font) / 2, 0, displayText.c_str());
+}
+
+// Funkcje pomocnicze dla minigier
+void resetStrengthGame(float& timer, float& timeLimit, int& stage, int& clicked, int& total,
+    float& btnX, float& btnY, bool& active, int screen_w, int screen_h, float scale_x, float scale_y) {
+    timer = 0;
+    stage = 1;
+    clicked = 0;
+    total = 10;
+    timeLimit = (5.0f * 5.0f) / stage;
+    btnX = (rand() % (int)(screen_w - 200 * scale_x)) + 100 * scale_x;
+    btnY = (rand() % (int)(screen_h - 400 * scale_y)) + 200 * scale_y;
+    active = true;
+}
+
+void generateNewMathProblem(int& a, int& b, int& operation, int& answer, int stage, float& timeLimit) {
+    operation = rand() % 3;
+    int maxNum = 10 + stage * 5;
+    a = rand() % maxNum + 1;
+    b = rand() % maxNum + 1;
+
+    if (operation == 0) answer = a + b;
+    else if (operation == 1) {
+        if (a < b) {
+            int temp = a;
+            a = b;
+            b = temp;
+        }
+        answer = a - b;
+    }
+    else answer = a * b;
+
+    timeLimit = (5.0f * 5.0f) / stage;
+}
+
+void spawnBall(vector<Ball>& balls, int stage, int screen_w, float scale_x) {
+    Ball b;
+    b.x = rand() % (int)(screen_w - 60 * scale_x) + 30 * scale_x;
+    b.y = -30;
+    b.speed = 3.0f + stage * 0.5f;
+    b.isGolden = (rand() % 20 == 0); // 5% szans na złotą kulkę
+    b.active = true;
+    balls.push_back(b);
+}
+
+void generateNewLetter(char& letter, int stage, float& timeLimit) {
+    letter = 'A' + (rand() % 26);
+    timeLimit = (5.0f * 5.0f) / stage;
 }
 
 int main() {
@@ -1515,9 +1565,47 @@ int main() {
     string playerNameInput = "";
     bool inputActive = false;
     int selectedSaveSlot = 0;
-    bool showLevelUp = false;
-    float levelUpTimer = 0;
     int previousLevel = player.level;
+
+    // Zmienne dla minigier
+    float miniGameTimer = 0;
+    float miniGameTimeLimit = 5.0f;
+    int miniGameStage = 1;
+    int miniGameScore = 0;
+    float baseTime = 5.0f;
+
+    // Minigra Siła - klikanie przycisków
+    int strengthButtonsClicked = 0;
+    int strengthButtonsTotal = 10;
+    float strengthButtonX = 0;
+    float strengthButtonY = 0;
+    bool strengthButtonActive = false;
+
+    // Minigra Magia - matematyka
+    int mathA = 0, mathB = 0, mathAnswer = 0;
+    int mathOperation = 0; // 0=+, 1=-, 2=*
+    string mathInput = "";
+    bool mathInputActive = false;
+
+    // Minigra Agility - unikanie kulek
+    float playerX = 0;
+    float playerSpeed = 5.0f; // Wolniejszy gracz
+    vector<Ball> balls;
+    float ballSpawnTimer = 0;
+    float ballSpawnInterval = 0.5f; // Więcej kulek
+    bool leftPressed = false, rightPressed = false;
+    float survivalTimer = 0; // Timer do punktów za przetrwanie
+
+    // Minigra Witalność - wciskanie liter
+    char targetLetter = 'A';
+    bool letterShown = false;
+
+    // Komunikat o braku punktów
+    bool showNoPointsMessage = false;
+    float noPointsMessageTimer = 0;
+
+    // Stan poprzedni do powrotu po level up
+    GameState stateBeforeLevelUp = MENU;
 
     al_start_timer(timer);
 
@@ -1532,20 +1620,108 @@ int main() {
         if (event.type == ALLEGRO_EVENT_TIMER) {
             redraw = true;
 
-            // Timer dla powiadomienia o awansie
-            if (showLevelUp) {
-                levelUpTimer += 1.0 / 60.0;
-                if (levelUpTimer > 3.0) {
-                    showLevelUp = false;
-                    levelUpTimer = 0;
+            // Timer dla komunikatu o braku punktów (2 sekundy)
+            if (showNoPointsMessage) {
+                noPointsMessageTimer += 1.0 / 60.0;
+                if (noPointsMessageTimer > 2.0) {
+                    showNoPointsMessage = false;
+                    noPointsMessageTimer = 0;
                 }
             }
 
-            // Sprawdź czy był awans
-            if (player.level > previousLevel) {
-                showLevelUp = true;
-                levelUpTimer = 0;
+            // Sprawdź czy był awans - wyświetl ekran level up
+            if (player.level > previousLevel && state != LEVEL_UP_SCREEN) {
+                stateBeforeLevelUp = state;
+                state = LEVEL_UP_SCREEN;
                 previousLevel = player.level;
+            }
+
+            // Timery dla minigier
+            if (state == MINIGRA_SILA && strengthButtonActive) {
+                miniGameTimer += 1.0 / 60.0;
+                if (miniGameTimer >= miniGameTimeLimit) {
+                    // Czas minął, koniec gry
+                    player.stats.strength += miniGameScore;
+                    gainExp(player, miniGameScore * 2);
+                    state = ARENA_TRENINGOWA;
+                }
+            }
+            else if (state == MINIGRA_MAGIA) {
+                miniGameTimer += 1.0 / 60.0;
+                if (miniGameTimer >= miniGameTimeLimit) {
+                    // Czas minął, koniec gry
+                    player.stats.magic += miniGameScore;
+                    gainExp(player, miniGameScore * 2);
+                    state = ARENA_TRENINGOWA;
+                }
+            }
+            else if (state == MINIGRA_AGILITY) {
+                int current_w = fullscreen ? screen_w : windowed_w;
+                int current_h = fullscreen ? screen_h : windowed_h;
+
+                // Timer przetrwania - co 5 sekund +5 punktów
+                survivalTimer += 1.0 / 60.0;
+                if (survivalTimer >= 5.0) {
+                    miniGameScore += 5;
+                    survivalTimer = 0;
+                }
+
+                // Ruch gracza
+                if (leftPressed && playerX > 0) playerX -= playerSpeed * scale_x;
+                if (rightPressed && playerX < current_w - 60 * scale_x) playerX += playerSpeed * scale_x;
+
+                // Spawn kulek - częściej
+                ballSpawnTimer += 1.0 / 60.0;
+                if (ballSpawnTimer >= ballSpawnInterval) {
+                    spawnBall(balls, miniGameStage, current_w, scale_x);
+                    ballSpawnTimer = 0;
+                    ballSpawnInterval = max(0.2f, 0.5f - miniGameStage * 0.02f);
+                }
+
+                // Update kulek
+                for (auto& ball : balls) {
+                    if (ball.active) {
+                        ball.y += ball.speed * scale_y;
+
+                        // Sprawdź kolizję z graczem
+                        if (ball.y + 30 * scale_y > current_h - 150 * scale_y &&
+                            ball.y < current_h - 100 * scale_y &&
+                            ball.x > playerX - 30 * scale_x &&
+                            ball.x < playerX + 60 * scale_x) {
+
+                            if (ball.isGolden) {
+                                miniGameScore += 5;
+                                ball.active = false;
+                            }
+                            else {
+                                // Koniec gry
+                                player.stats.agility += miniGameScore;
+                                gainExp(player, miniGameScore * 2);
+                                state = ARENA_TRENINGOWA;
+                                balls.clear();
+                            }
+                        }
+
+                        // Usuń kulki poza ekranem
+                        if (ball.y > current_h) ball.active = false;
+                    }
+                }
+
+                // Zwiększ trudność co 10 punktów
+                if (miniGameScore / 10 > miniGameStage - 1) {
+                    miniGameStage++;
+                }
+            }
+            else if (state == MINIGRA_WITALNOSC && letterShown) {
+                miniGameTimer += 1.0 / 60.0;
+                if (miniGameTimer >= miniGameTimeLimit) {
+                    // Czas minął, koniec gry
+                    player.stats.vitality += miniGameScore;
+                    gainExp(player, miniGameScore * 2);
+                    player.maxHp = calculateMaxHp(player);
+                    player.currentHp = player.maxHp;
+                    state = ARENA_TRENINGOWA;
+                }
             }
         }
         else if (event.type == ALLEGRO_EVENT_DISPLAY_CLOSE) {
@@ -1575,6 +1751,33 @@ int main() {
                 }
 
                 al_register_event_source(queue, al_get_display_event_source(display));
+            }
+
+            // Minigra Agility - sterowanie strzałkami
+            if (state == MINIGRA_AGILITY) {
+                if (event.keyboard.keycode == ALLEGRO_KEY_LEFT) leftPressed = true;
+                if (event.keyboard.keycode == ALLEGRO_KEY_RIGHT) rightPressed = true;
+            }
+
+            // Minigra Witalność - wciskanie liter
+            if (state == MINIGRA_WITALNOSC && letterShown) {
+                if (event.keyboard.keycode >= ALLEGRO_KEY_A && event.keyboard.keycode <= ALLEGRO_KEY_Z) {
+                    char pressed = 'A' + (event.keyboard.keycode - ALLEGRO_KEY_A);
+                    if (pressed == targetLetter) {
+                        miniGameScore++;
+                        miniGameStage++;
+                        generateNewLetter(targetLetter, miniGameStage, miniGameTimeLimit);
+                        miniGameTimer = 0;
+                    }
+                    else {
+                        // Źle, koniec gry
+                        player.stats.vitality += miniGameScore;
+                        gainExp(player, miniGameScore * 2);
+                        player.maxHp = calculateMaxHp(player);
+                        player.currentHp = player.maxHp;
+                        state = ARENA_TRENINGOWA;
+                    }
+                }
             }
 
             // Obsługa wpisywania nazwy
@@ -1634,6 +1837,55 @@ int main() {
                         playerNameInput += ' ';
                     }
                 }
+            }
+
+            // Obsługa wpisywania odpowiedzi w minigrze matematycznej
+            if (mathInputActive && state == MINIGRA_MAGIA) {
+                if (event.keyboard.keycode == ALLEGRO_KEY_BACKSPACE) {
+                    if (!mathInput.empty()) {
+                        mathInput.pop_back();
+                    }
+                }
+                else if (event.keyboard.keycode == ALLEGRO_KEY_ENTER) {
+                    if (!mathInput.empty()) {
+                        try {
+                            int userAnswer = stoi(mathInput);
+                            if (userAnswer == mathAnswer) {
+                                miniGameScore++;
+                                miniGameStage++;
+                                mathInput = "";
+                                generateNewMathProblem(mathA, mathB, mathOperation, mathAnswer, miniGameStage, miniGameTimeLimit);
+                                miniGameTimer = 0;
+                            }
+                            else {
+                                // Źle, koniec gry
+                                player.stats.magic += miniGameScore;
+                                gainExp(player, miniGameScore * 2);
+                                state = ARENA_TRENINGOWA;
+                            }
+                        }
+                        catch (...) {
+                            mathInput = "";
+                        }
+                    }
+                }
+                else if (event.keyboard.keycode >= ALLEGRO_KEY_0 && event.keyboard.keycode <= ALLEGRO_KEY_9) {
+                    mathInput += ('0' + (event.keyboard.keycode - ALLEGRO_KEY_0));
+                }
+                else if (event.keyboard.keycode >= ALLEGRO_KEY_PAD_0 && event.keyboard.keycode <= ALLEGRO_KEY_PAD_9) {
+                    mathInput += ('0' + (event.keyboard.keycode - ALLEGRO_KEY_PAD_0));
+                }
+                else if (event.keyboard.keycode == ALLEGRO_KEY_MINUS || event.keyboard.keycode == ALLEGRO_KEY_PAD_MINUS) {
+                    if (mathInput.empty()) {
+                        mathInput += '-';
+                    }
+                }
+            }
+        }
+        else if (event.type == ALLEGRO_EVENT_KEY_UP) {
+            if (state == MINIGRA_AGILITY) {
+                if (event.keyboard.keycode == ALLEGRO_KEY_LEFT) leftPressed = false;
+                if (event.keyboard.keycode == ALLEGRO_KEY_RIGHT) rightPressed = false;
             }
         }
         else if (event.type == ALLEGRO_EVENT_MOUSE_BUTTON_DOWN) {
@@ -1708,16 +1960,20 @@ int main() {
             }
             // MENU
             else if (state == MENU) {
-                Button arenaBtn = createButton(current_w / 2 - 150 * scale_x, 350 * scale_y, 300 * scale_x, 60 * scale_y,
+                Button arenaBtn = createButton(current_w / 2 - 150 * scale_x, 340 * scale_y, 300 * scale_x, 60 * scale_y,
                     "ARENA", al_map_rgb(200, 50, 50), al_map_rgb(255, 255, 255), al_map_rgb(220, 70, 70));
-                Button shopBtn = createButton(current_w / 2 - 150 * scale_x, 440 * scale_y, 300 * scale_x, 60 * scale_y,
+                Button shopBtn = createButton(current_w / 2 - 150 * scale_x, 430 * scale_y, 300 * scale_x, 60 * scale_y,
                     "SKLEP", al_map_rgb(50, 50, 200), al_map_rgb(255, 255, 255), al_map_rgb(70, 70, 220));
-                Button statsBtn = createButton(current_w / 2 - 150 * scale_x, 530 * scale_y, 300 * scale_x, 60 * scale_y,
+                Button statsBtn = createButton(current_w / 2 - 150 * scale_x, 520 * scale_y, 300 * scale_x, 60 * scale_y,
                     "STATYSTYKI", al_map_rgb(150, 50, 150), al_map_rgb(255, 255, 255), al_map_rgb(170, 70, 170));
-                Button saveBtn = createButton(current_w / 2 - 150 * scale_x, 620 * scale_y, 300 * scale_x, 60 * scale_y,
+                Button trainingBtn = createButton(current_w / 2 - 150 * scale_x, 610 * scale_y, 300 * scale_x, 60 * scale_y,
+                    "ARENA TRENINGOWA", al_map_rgb(100, 200, 100), al_map_rgb(255, 255, 255), al_map_rgb(120, 220, 120));
+                Button saveBtn = createButton(current_w / 2 - 150 * scale_x, 730 * scale_y, 300 * scale_x, 60 * scale_y,
                     "ZAPISZ GRE", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
-                Button manageBtn = createButton(current_w / 2 - 150 * scale_x, 710 * scale_y, 300 * scale_x, 60 * scale_y,
+                Button manageBtn = createButton(current_w / 2 - 150 * scale_x, 810 * scale_y, 300 * scale_x, 60 * scale_y,
                     "ZARZADZAJ ZAPISAMI", al_map_rgb(150, 100, 50), al_map_rgb(255, 255, 255), al_map_rgb(180, 120, 70));
+                Button exitBtn = createButton(current_w / 2 - 300 * scale_x, 810 * scale_y, 130 * scale_x, 60 * scale_y,
+                    "wyjscie", al_map_rgb(150, 0, 50), al_map_rgb(255, 255, 255), al_map_rgb(180, 20, 70));
 
                 if (isMouseOverButton(arenaBtn, mouseX, mouseY)) {
                     state = ARENA;
@@ -1728,11 +1984,106 @@ int main() {
                 else if (isMouseOverButton(statsBtn, mouseX, mouseY)) {
                     state = STATYSTYKI;
                 }
+                else if (isMouseOverButton(trainingBtn, mouseX, mouseY)) {
+                    state = ARENA_TRENINGOWA;
+                }
                 else if (isMouseOverButton(saveBtn, mouseX, mouseY)) {
                     saveGame(player);
                 }
                 else if (isMouseOverButton(manageBtn, mouseX, mouseY)) {
                     state = ZARZAD;
+                }
+                else if (isMouseOverButton(exitBtn, mouseX, mouseY)) {
+                        running = false;
+                }
+            }
+            // ARENA TRENINGOWA - wybór minigry
+            else if (state == ARENA_TRENINGOWA) {
+                Button strengthBtn = createButton(current_w / 2 - 150 * scale_x, 300 * scale_y, 300 * scale_x, 60 * scale_y,
+                    "TRENING SILY", al_map_rgb(200, 50, 50), al_map_rgb(255, 255, 255), al_map_rgb(220, 70, 70));
+                Button magicBtn = createButton(current_w / 2 - 150 * scale_x, 390 * scale_y, 300 * scale_x, 60 * scale_y,
+                    "TRENING MAGII", al_map_rgb(100, 50, 200), al_map_rgb(255, 255, 255), al_map_rgb(120, 70, 220));
+                Button agilityBtn = createButton(current_w / 2 - 150 * scale_x, 480 * scale_y, 300 * scale_x, 60 * scale_y,
+                    "TRENING ZRECZNOSCI", al_map_rgb(50, 200, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 220, 70));
+                Button vitalityBtn = createButton(current_w / 2 - 150 * scale_x, 570 * scale_y, 300 * scale_x, 60 * scale_y,
+                    "TRENING WITALNOSCI", al_map_rgb(200, 100, 50), al_map_rgb(255, 255, 255), al_map_rgb(220, 120, 70));
+                Button backBtn = createButton(current_w / 2 - 100 * scale_x, 700 * scale_y, 200 * scale_x, 50 * scale_y,
+                    "POWROT", al_map_rgb(100, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 130));
+
+                if (isMouseOverButton(strengthBtn, mouseX, mouseY)) {
+                    state = MINIGRA_SILA;
+                    resetStrengthGame(miniGameTimer, miniGameTimeLimit, miniGameStage, strengthButtonsClicked,
+                        strengthButtonsTotal, strengthButtonX, strengthButtonY, strengthButtonActive,
+                        current_w, current_h, scale_x, scale_y);
+                    miniGameScore = 0;
+                }
+                else if (isMouseOverButton(magicBtn, mouseX, mouseY)) {
+                    state = MINIGRA_MAGIA;
+                    miniGameTimer = 0;
+                    miniGameStage = 1;
+                    miniGameScore = 0;
+                    mathInput = "";
+                    mathInputActive = true;
+                    generateNewMathProblem(mathA, mathB, mathOperation, mathAnswer, miniGameStage, miniGameTimeLimit);
+                }
+                else if (isMouseOverButton(agilityBtn, mouseX, mouseY)) {
+                    state = MINIGRA_AGILITY;
+                    miniGameTimer = 0;
+                    miniGameStage = 1;
+                    miniGameScore = 0;
+                    playerX = current_w / 2;
+                    balls.clear();
+                    ballSpawnTimer = 0;
+                    ballSpawnInterval = 0.5f;
+                    survivalTimer = 0;
+                    leftPressed = false;
+                    rightPressed = false;
+                }
+                else if (isMouseOverButton(vitalityBtn, mouseX, mouseY)) {
+                    state = MINIGRA_WITALNOSC;
+                    miniGameTimer = 0;
+                    miniGameStage = 1;
+                    miniGameScore = 0;
+                    generateNewLetter(targetLetter, miniGameStage, miniGameTimeLimit);
+                    letterShown = true;
+                }
+                else if (isMouseOverButton(backBtn, mouseX, mouseY)) {
+                    state = MENU;
+                }
+            }
+            // MINIGRA SIŁA - klikanie przycisków
+            else if (state == MINIGRA_SILA && strengthButtonActive) {
+                Button targetBtn = createButton(strengthButtonX, strengthButtonY, 100 * scale_x, 100 * scale_y,
+                    "KLIK!", al_map_rgb(255, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(255, 150, 150));
+
+                if (isMouseOverButton(targetBtn, mouseX, mouseY)) {
+                    miniGameScore++;
+                    strengthButtonsClicked++;
+                    miniGameTimer = 0;
+                    miniGameStage++;
+                    miniGameTimeLimit = (5.0f * 5.0f) / miniGameStage;
+
+                    if (strengthButtonsClicked >= strengthButtonsTotal) {
+                        // Koniec gry - wszystkie przyciski kliknięte
+                        player.stats.strength += miniGameScore;
+                        gainExp(player, miniGameScore * 2);
+                        state = ARENA_TRENINGOWA;
+                    }
+                    else {
+                        // Nowy przycisk
+                        strengthButtonX = (rand() % (int)(current_w - 200 * scale_x)) + 100 * scale_x;
+                        strengthButtonY = (rand() % (int)(current_h - 400 * scale_y)) + 200 * scale_y;
+                    }
+                }
+            }
+            // MINIGRA MAGIA - matematyka
+            else if (state == MINIGRA_MAGIA && mathInputActive) {
+                // Pole tekstowe do wpisywania odpowiedzi
+                Button inputBox = createButton(current_w / 2 - 100 * scale_x, 450 * scale_y, 200 * scale_x, 50 * scale_y,
+                    "", al_map_rgb(50, 50, 70), al_map_rgb(255, 255, 255), al_map_rgb(70, 70, 100));
+
+                if (isMouseOverButton(inputBox, mouseX, mouseY)) {
+                    mathInputActive = true;
                 }
             }
             // ARENA - wybor przeciwnika
@@ -1899,10 +2250,71 @@ int main() {
             }
             // STATYSTYKI
             else if (state == STATYSTYKI) {
+                // Przyciski +20 do statystyk
+                Button addStrBtn = createButton(current_w / 2 + 200 * scale_x, 420 * scale_y, 80 * scale_x, 40 * scale_y,
+                    "+20", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
+                Button addAgiBtn = createButton(current_w / 2 + 200 * scale_x, 470 * scale_y, 80 * scale_x, 40 * scale_y,
+                    "+20", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
+                Button addVitBtn = createButton(current_w / 2 + 200 * scale_x, 520 * scale_y, 80 * scale_x, 40 * scale_y,
+                    "+20", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
+                Button addMagBtn = createButton(current_w / 2 + 200 * scale_x, 570 * scale_y, 80 * scale_x, 40 * scale_y,
+                    "+20", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
+
+                if (isMouseOverButton(addStrBtn, mouseX, mouseY)) {
+                    if (player.skillPoints >= 20) {
+                        player.stats.strength += 20;
+                        player.skillPoints -= 20;
+                    }
+                    else {
+                        showNoPointsMessage = true;
+                        noPointsMessageTimer = 0;
+                    }
+                }
+                else if (isMouseOverButton(addAgiBtn, mouseX, mouseY)) {
+                    if (player.skillPoints >= 20) {
+                        player.stats.agility += 20;
+                        player.skillPoints -= 20;
+                    }
+                    else {
+                        showNoPointsMessage = true;
+                        noPointsMessageTimer = 0;
+                    }
+                }
+                else if (isMouseOverButton(addVitBtn, mouseX, mouseY)) {
+                    if (player.skillPoints >= 20) {
+                        player.stats.vitality += 20;
+                        player.skillPoints -= 20;
+                        player.maxHp = calculateMaxHp(player);
+                        player.currentHp = player.maxHp;
+                    }
+                    else {
+                        showNoPointsMessage = true;
+                        noPointsMessageTimer = 0;
+                    }
+                }
+                else if (isMouseOverButton(addMagBtn, mouseX, mouseY)) {
+                    if (player.skillPoints >= 20) {
+                        player.stats.magic += 20;
+                        player.skillPoints -= 20;
+                    }
+                    else {
+                        showNoPointsMessage = true;
+                        noPointsMessageTimer = 0;
+                    }
+                }
+
                 Button backBtn = createButton(current_w / 2 - 100 * scale_x, 800 * scale_y, 200 * scale_x, 50 * scale_y,
                     "POWROT", al_map_rgb(100, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 130));
                 if (isMouseOverButton(backBtn, mouseX, mouseY)) {
                     state = MENU;
+                }
+            }
+            // LEVEL UP SCREEN
+            else if (state == LEVEL_UP_SCREEN) {
+                Button continueBtn = createButton(current_w / 2 - 100 * scale_x, 600 * scale_y, 200 * scale_x, 60 * scale_y,
+                    "KONTYNUUJ", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
+                if (isMouseOverButton(continueBtn, mouseX, mouseY)) {
+                    state = stateBeforeLevelUp;
                 }
             }
             // ZARZĄDZANIE ZAPISAMI
@@ -2082,28 +2494,36 @@ int main() {
                 al_draw_text(smallFont, al_map_rgb(180, 180, 255), current_w / 2, 250 * scale_y,
                     ALLEGRO_ALIGN_CENTRE, statsText);
 
-                Button arenaBtn = createButton(current_w / 2 - 150 * scale_x, 350 * scale_y, 300 * scale_x, 60 * scale_y,
+                Button arenaBtn = createButton(current_w / 2 - 150 * scale_x, 340 * scale_y, 300 * scale_x, 60 * scale_y,
                     "ARENA", al_map_rgb(200, 50, 50), al_map_rgb(255, 255, 255), al_map_rgb(220, 70, 70));
-                Button shopBtn = createButton(current_w / 2 - 150 * scale_x, 440 * scale_y, 300 * scale_x, 60 * scale_y,
+                Button shopBtn = createButton(current_w / 2 - 150 * scale_x, 430 * scale_y, 300 * scale_x, 60 * scale_y,
                     "SKLEP", al_map_rgb(50, 50, 200), al_map_rgb(255, 255, 255), al_map_rgb(70, 70, 220));
-                Button statsBtn = createButton(current_w / 2 - 150 * scale_x, 530 * scale_y, 300 * scale_x, 60 * scale_y,
+                Button statsBtn = createButton(current_w / 2 - 150 * scale_x, 520 * scale_y, 300 * scale_x, 60 * scale_y,
                     "STATYSTYKI", al_map_rgb(150, 50, 150), al_map_rgb(255, 255, 255), al_map_rgb(170, 70, 170));
-                Button saveBtn = createButton(current_w / 2 - 150 * scale_x, 620 * scale_y, 300 * scale_x, 60 * scale_y,
+                Button trainingBtn = createButton(current_w / 2 - 150 * scale_x, 610 * scale_y, 300 * scale_x, 60 * scale_y,
+                    "ARENA TRENINGOWA", al_map_rgb(100, 200, 100), al_map_rgb(255, 255, 255), al_map_rgb(120, 220, 120));
+                Button saveBtn = createButton(current_w / 2 - 150 * scale_x, 730 * scale_y, 300 * scale_x, 60 * scale_y,
                     "ZAPISZ GRE", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
-                Button manageBtn = createButton(current_w / 2 - 150 * scale_x, 710 * scale_y, 300 * scale_x, 60 * scale_y,
+                Button manageBtn = createButton(current_w / 2 - 150 * scale_x, 810 * scale_y, 300 * scale_x, 60 * scale_y,
                     "ZARZADZAJ ZAPISAMI", al_map_rgb(150, 100, 50), al_map_rgb(255, 255, 255), al_map_rgb(180, 120, 70));
+                Button exitBtn = createButton(current_w / 2 - 300 * scale_x, 810 * scale_y, 130 * scale_x, 60 * scale_y,
+                    "wyjscie", al_map_rgb(150, 0, 50), al_map_rgb(255, 255, 255), al_map_rgb(180, 20, 70));
 
                 arenaBtn.isHovered = isMouseOverButton(arenaBtn, mouseX, mouseY);
                 shopBtn.isHovered = isMouseOverButton(shopBtn, mouseX, mouseY);
                 statsBtn.isHovered = isMouseOverButton(statsBtn, mouseX, mouseY);
+                trainingBtn.isHovered = isMouseOverButton(trainingBtn, mouseX, mouseY);
                 saveBtn.isHovered = isMouseOverButton(saveBtn, mouseX, mouseY);
                 manageBtn.isHovered = isMouseOverButton(manageBtn, mouseX, mouseY);
+                exitBtn.isHovered = isMouseOverButton(exitBtn, mouseX, mouseY);
 
                 drawButton(arenaBtn, font);
                 drawButton(shopBtn, font);
                 drawButton(statsBtn, font);
+                drawButton(trainingBtn, smallFont);
                 drawButton(saveBtn, font);
                 drawButton(manageBtn, smallFont);
+                drawButton(exitBtn, smallFont);
 
                 al_draw_text(smallFont, al_map_rgb(150, 150, 150), current_w / 2, current_h - 50 * scale_y,
                     ALLEGRO_ALIGN_CENTRE, "F11 - Tryb pelnoekranowy");
@@ -2282,31 +2702,83 @@ int main() {
 
                 char statText[256];
                 sprintf(statText, "Imie: %s", player.name.c_str());
-                al_draw_text(font, al_map_rgb(255, 255, 255), current_w / 2, 200 * scale_y, ALLEGRO_ALIGN_CENTRE, statText);
+                al_draw_text(font, al_map_rgb(255, 255, 255), current_w / 2, 150 * scale_y, ALLEGRO_ALIGN_CENTRE, statText);
                 sprintf(statText, "Poziom: %d | EXP: %d/%d", player.level, player.exp, player.expToNext);
-                al_draw_text(font, al_map_rgb(255, 255, 255), current_w / 2, 250 * scale_y, ALLEGRO_ALIGN_CENTRE, statText);
+                al_draw_text(font, al_map_rgb(255, 255, 255), current_w / 2, 200 * scale_y, ALLEGRO_ALIGN_CENTRE, statText);
                 sprintf(statText, "HP: %d/%d | Energia: %d/%d", player.currentHp, player.maxHp, player.energy, player.maxEnergy);
-                al_draw_text(font, al_map_rgb(255, 255, 255), current_w / 2, 300 * scale_y, ALLEGRO_ALIGN_CENTRE, statText);
-                sprintf(statText, "Zloto: %d", player.gold);
-                al_draw_text(font, al_map_rgb(255, 215, 0), current_w / 2, 350 * scale_y, ALLEGRO_ALIGN_CENTRE, statText);
+                al_draw_text(font, al_map_rgb(255, 255, 255), current_w / 2, 250 * scale_y, ALLEGRO_ALIGN_CENTRE, statText);
+                sprintf(statText, "Zloto: %d | Punkty umiejetnosci: %d", player.gold, player.skillPoints);
+                al_draw_text(font, al_map_rgb(255, 215, 0), current_w / 2, 300 * scale_y, ALLEGRO_ALIGN_CENTRE, statText);
 
-                sprintf(statText, "Sila: %d | Zrecznosc: %d", player.stats.strength, player.stats.agility);
-                al_draw_text(font, al_map_rgb(200, 200, 200), current_w / 2, 420 * scale_y, ALLEGRO_ALIGN_CENTRE, statText);
-                sprintf(statText, "Witalnosc: %d | Magia: %d", player.stats.vitality, player.stats.magic);
-                al_draw_text(font, al_map_rgb(200, 200, 200), current_w / 2, 470 * scale_y, ALLEGRO_ALIGN_CENTRE, statText);
+                al_draw_text(font, al_map_rgb(200, 200, 200), current_w / 2, 370 * scale_y, ALLEGRO_ALIGN_CENTRE, "Ulepszanie statystyk (20 punktow = +20 do statystyki):");
+
+                // Statystyki z przyciskami +20
+                sprintf(statText, "Sila: %d", player.stats.strength);
+                al_draw_text(font, al_map_rgb(200, 200, 200), current_w / 2 - 100 * scale_x, 420 * scale_y, 0, statText);
+                Button addStrBtn = createButton(current_w / 2 + 200 * scale_x, 420 * scale_y, 80 * scale_x, 40 * scale_y,
+                    "+20", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
+                addStrBtn.isHovered = isMouseOverButton(addStrBtn, mouseX, mouseY);
+                drawButton(addStrBtn, smallFont);
+
+                sprintf(statText, "Zrecznosc: %d", player.stats.agility);
+                al_draw_text(font, al_map_rgb(200, 200, 200), current_w / 2 - 100 * scale_x, 470 * scale_y, 0, statText);
+                Button addAgiBtn = createButton(current_w / 2 + 200 * scale_x, 470 * scale_y, 80 * scale_x, 40 * scale_y,
+                    "+20", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
+                addAgiBtn.isHovered = isMouseOverButton(addAgiBtn, mouseX, mouseY);
+                drawButton(addAgiBtn, smallFont);
+
+                sprintf(statText, "Witalnosc: %d", player.stats.vitality);
+                al_draw_text(font, al_map_rgb(200, 200, 200), current_w / 2 - 100 * scale_x, 520 * scale_y, 0, statText);
+                Button addVitBtn = createButton(current_w / 2 + 200 * scale_x, 520 * scale_y, 80 * scale_x, 40 * scale_y,
+                    "+20", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
+                addVitBtn.isHovered = isMouseOverButton(addVitBtn, mouseX, mouseY);
+                drawButton(addVitBtn, smallFont);
+
+                sprintf(statText, "Magia: %d", player.stats.magic);
+                al_draw_text(font, al_map_rgb(200, 200, 200), current_w / 2 - 100 * scale_x, 570 * scale_y, 0, statText);
+                Button addMagBtn = createButton(current_w / 2 + 200 * scale_x, 570 * scale_y, 80 * scale_x, 40 * scale_y,
+                    "+20", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
+                addMagBtn.isHovered = isMouseOverButton(addMagBtn, mouseX, mouseY);
+                drawButton(addMagBtn, smallFont);
 
                 sprintf(statText, "Zwyciestwa: %d | Porazki: %d", player.wins, player.losses);
-                al_draw_text(font, al_map_rgb(200, 200, 200), current_w / 2, 540 * scale_y, ALLEGRO_ALIGN_CENTRE, statText);
+                al_draw_text(font, al_map_rgb(200, 200, 200), current_w / 2, 650 * scale_y, ALLEGRO_ALIGN_CENTRE, statText);
 
                 sprintf(statText, "Obrazenia: x%.2f | Obrona: x%.2f", player.stats.strengthMult, player.stats.defenseMult);
-                al_draw_text(font, al_map_rgb(150, 150, 255), current_w / 2, 610 * scale_y, ALLEGRO_ALIGN_CENTRE, statText);
+                al_draw_text(font, al_map_rgb(150, 150, 255), current_w / 2, 700 * scale_y, ALLEGRO_ALIGN_CENTRE, statText);
                 sprintf(statText, "Zdrowie: x%.2f | Magia: x%.2f", player.stats.healthMult, player.stats.magicMult);
-                al_draw_text(font, al_map_rgb(150, 150, 255), current_w / 2, 660 * scale_y, ALLEGRO_ALIGN_CENTRE, statText);
+                al_draw_text(font, al_map_rgb(150, 150, 255), current_w / 2, 750 * scale_y, ALLEGRO_ALIGN_CENTRE, statText);
 
                 Button backBtn = createButton(current_w / 2 - 100 * scale_x, 800 * scale_y, 200 * scale_x, 50 * scale_y,
                     "POWROT", al_map_rgb(100, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 130));
                 backBtn.isHovered = isMouseOverButton(backBtn, mouseX, mouseY);
                 drawButton(backBtn, font);
+
+                // Komunikat o braku punktów
+                if (showNoPointsMessage) {
+                    al_draw_text(titleFont, al_map_rgb(255, 100, 100), current_w / 2, current_h / 2,
+                        ALLEGRO_ALIGN_CENTRE, "BRAK WYSTARCZAJACEJ ILOSCI PUNKTOW!");
+                }
+            }
+            // LEVEL UP SCREEN
+            else if (state == LEVEL_UP_SCREEN) {
+                al_clear_to_color(al_map_rgb(30, 40, 60));
+
+                al_draw_text(titleFont, al_map_rgb(255, 215, 0), current_w / 2, 200 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, "*** AWANS POZIOMU! ***");
+
+                char levelText[128];
+                sprintf(levelText, "Nowy poziom: %d", player.level);
+                al_draw_text(titleFont, al_map_rgb(255, 255, 255), current_w / 2, 300 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, levelText);
+
+                al_draw_text(font, al_map_rgb(200, 200, 255), current_w / 2, 400 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, "Otrzymujesz 2 punkty umiejetnosci!");
+
+                Button continueBtn = createButton(current_w / 2 - 100 * scale_x, 600 * scale_y, 200 * scale_x, 60 * scale_y,
+                    "KONTYNUUJ", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
+                continueBtn.isHovered = isMouseOverButton(continueBtn, mouseX, mouseY);
+                drawButton(continueBtn, font);
             }
             // ZARZĄDZANIE ZAPISAMI
             else if (state == ZARZAD) {
@@ -2354,32 +2826,150 @@ int main() {
                 drawButton(backBtn, font);
             }
 
-            // Powiadomienie o awansie poziomu
-            if (showLevelUp) {
-                float alpha = 1.0f;
-                if (levelUpTimer > 2.5) {
-                    alpha = 1.0f - (levelUpTimer - 2.5f) / 0.5f;
+            // ARENA TRENINGOWA - menu wyboru
+            else if (state == ARENA_TRENINGOWA) {
+                al_draw_text(titleFont, al_map_rgb(100, 200, 100), current_w / 2, 100 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, "ARENA TRENINGOWA");
+
+                al_draw_text(font, al_map_rgb(255, 255, 255), current_w / 2, 200 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, "Wybierz trening:");
+
+                Button strengthBtn = createButton(current_w / 2 - 150 * scale_x, 300 * scale_y, 300 * scale_x, 60 * scale_y,
+                    "TRENING SILY", al_map_rgb(200, 50, 50), al_map_rgb(255, 255, 255), al_map_rgb(220, 70, 70));
+                Button magicBtn = createButton(current_w / 2 - 150 * scale_x, 390 * scale_y, 300 * scale_x, 60 * scale_y,
+                    "TRENING MAGII", al_map_rgb(100, 50, 200), al_map_rgb(255, 255, 255), al_map_rgb(120, 70, 220));
+                Button agilityBtn = createButton(current_w / 2 - 150 * scale_x, 480 * scale_y, 300 * scale_x, 60 * scale_y,
+                    "TRENING ZRECZNOSCI", al_map_rgb(50, 200, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 220, 70));
+                Button vitalityBtn = createButton(current_w / 2 - 150 * scale_x, 570 * scale_y, 300 * scale_x, 60 * scale_y,
+                    "TRENING WITALNOSCI", al_map_rgb(200, 100, 50), al_map_rgb(255, 255, 255), al_map_rgb(220, 120, 70));
+                Button backBtn = createButton(current_w / 2 - 100 * scale_x, 700 * scale_y, 200 * scale_x, 50 * scale_y,
+                    "POWROT", al_map_rgb(100, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 130));
+
+                strengthBtn.isHovered = isMouseOverButton(strengthBtn, mouseX, mouseY);
+                magicBtn.isHovered = isMouseOverButton(magicBtn, mouseX, mouseY);
+                agilityBtn.isHovered = isMouseOverButton(agilityBtn, mouseX, mouseY);
+                vitalityBtn.isHovered = isMouseOverButton(vitalityBtn, mouseX, mouseY);
+                backBtn.isHovered = isMouseOverButton(backBtn, mouseX, mouseY);
+
+                drawButton(strengthBtn, font);
+                drawButton(magicBtn, font);
+                drawButton(agilityBtn, smallFont);
+                drawButton(vitalityBtn, smallFont);
+                drawButton(backBtn, font);
+            }
+            // MINIGRA SIŁA
+            else if (state == MINIGRA_SILA) {
+                al_draw_text(titleFont, al_map_rgb(255, 100, 100), current_w / 2, 50 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, "TRENING SILY");
+
+                char scoreText[128];
+                sprintf(scoreText, "Punkty: %d | Kliknij %d/%d przyciskow",
+                    miniGameScore, strengthButtonsClicked, strengthButtonsTotal);
+                al_draw_text(font, al_map_rgb(255, 255, 255), current_w / 2, 120 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, scoreText);
+
+                // Timer
+                float remaining = miniGameTimeLimit - miniGameTimer;
+                sprintf(scoreText, "Czas: %.2f s", remaining);
+                al_draw_text(font, remaining < 2.0f ? al_map_rgb(255, 100, 100) : al_map_rgb(255, 255, 255),
+                    current_w / 2, 160 * scale_y, ALLEGRO_ALIGN_CENTRE, scoreText);
+
+                // Przycisk do kliknięcia
+                if (strengthButtonActive) {
+                    Button targetBtn = createButton(strengthButtonX, strengthButtonY, 100 * scale_x, 100 * scale_y,
+                        "KLIK!", al_map_rgb(255, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(255, 150, 150));
+                    targetBtn.isHovered = isMouseOverButton(targetBtn, mouseX, mouseY);
+                    drawButton(targetBtn, font);
                 }
+            }
+            // MINIGRA MAGIA
+            else if (state == MINIGRA_MAGIA) {
+                al_draw_text(titleFont, al_map_rgb(150, 100, 255), current_w / 2, 50 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, "TRENING MAGII");
 
-                int boxW = 600 * scale_x;
-                int boxH = 200 * scale_y;
-                int boxX = current_w / 2 - boxW / 2;
-                int boxY = current_h / 2 - boxH / 2;
+                char scoreText[128];
+                sprintf(scoreText, "Punkty: %d", miniGameScore);
+                al_draw_text(font, al_map_rgb(255, 255, 255), current_w / 2, 120 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, scoreText);
 
-                al_draw_filled_rectangle(boxX, boxY, boxX + boxW, boxY + boxH,
-                    al_map_rgba(50, 50, 50, (int)(200 * alpha)));
-                al_draw_rectangle(boxX, boxY, boxX + boxW, boxY + boxH,
-                    al_map_rgba(255, 215, 0, (int)(255 * alpha)), 4);
+                // Timer
+                float remaining = miniGameTimeLimit - miniGameTimer;
+                sprintf(scoreText, "Czas: %.2f s", remaining);
+                al_draw_text(font, remaining < 2.0f ? al_map_rgb(255, 100, 100) : al_map_rgb(255, 255, 255),
+                    current_w / 2, 160 * scale_y, ALLEGRO_ALIGN_CENTRE, scoreText);
 
-                al_draw_text(titleFont, al_map_rgba(255, 215, 0, (int)(255 * alpha)),
-                    current_w / 2, boxY + 30 * scale_y, ALLEGRO_ALIGN_CENTRE, "AWANS POZIOMU!");
+                // Zadanie
+                char problemText[128];
+                char opChar = '+';
+                if (mathOperation == 1) opChar = '-';
+                else if (mathOperation == 2) opChar = '*';
 
-                char levelText[128];
-                sprintf(levelText, "Nowy poziom: %d", player.level);
-                al_draw_text(font, al_map_rgba(255, 255, 255, (int)(255 * alpha)),
-                    current_w / 2, boxY + 100 * scale_y, ALLEGRO_ALIGN_CENTRE, levelText);
-                al_draw_text(font, al_map_rgba(200, 200, 255, (int)(255 * alpha)),
-                    current_w / 2, boxY + 140 * scale_y, ALLEGRO_ALIGN_CENTRE, "+2 Punkty umiejetnosci");
+                sprintf(problemText, "%d %c %d = ?", mathA, opChar, mathB);
+                al_draw_text(titleFont, al_map_rgb(255, 255, 0), current_w / 2, 300 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, problemText);
+
+                // Pole input
+                al_draw_text(font, al_map_rgb(255, 255, 255), current_w / 2, 420 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, "Wpisz odpowiedz i nacisnij ENTER:");
+                drawTextInput(current_w / 2 - 100 * scale_x, 450 * scale_y, 200 * scale_x, 50 * scale_y,
+                    mathInput, mathInputActive, font);
+            }
+            // MINIGRA AGILITY
+            else if (state == MINIGRA_AGILITY) {
+                al_draw_text(titleFont, al_map_rgb(100, 255, 100), current_w / 2, 50 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, "TRENING ZRECZNOSCI");
+
+                char scoreText[128];
+                sprintf(scoreText, "Punkty: %d | Etap: %d", miniGameScore, miniGameStage);
+                al_draw_text(font, al_map_rgb(255, 255, 255), current_w / 2, 120 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, scoreText);
+
+                // Timer przetrwania
+                float timeToNextBonus = 5.0f - survivalTimer;
+                sprintf(scoreText, "Nastepne +5 punktow za: %.1f s", timeToNextBonus);
+                al_draw_text(smallFont, al_map_rgb(255, 255, 100), current_w / 2, 160 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, scoreText);
+
+                al_draw_text(smallFont, al_map_rgb(200, 200, 200), current_w / 2, 190 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, "Strzalki: <- -> | Unikaj czerwonych kulek! | Zlap zlote!");
+
+                // Rysuj gracza (zielony kwadrat)
+                drawPlayer(playerX, current_h - 120 * scale_y, 60 * scale_x);
+
+                // Rysuj kulki
+                for (const auto& ball : balls) {
+                    if (ball.active) {
+                        ALLEGRO_COLOR ballColor = ball.isGolden ? al_map_rgb(255, 215, 0) : al_map_rgb(200, 50, 50);
+                        al_draw_filled_circle(ball.x, ball.y, 15 * scale_x, ballColor);
+                        al_draw_circle(ball.x, ball.y, 15 * scale_x, al_map_rgb(255, 255, 255), 2);
+                    }
+                }
+            }
+            // MINIGRA WITALNOŚĆ
+            else if (state == MINIGRA_WITALNOSC) {
+                al_draw_text(titleFont, al_map_rgb(255, 150, 50), current_w / 2, 50 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, "TRENING WITALNOSCI");
+
+                char scoreText[128];
+                sprintf(scoreText, "Punkty: %d | Etap: %d", miniGameScore, miniGameStage);
+                al_draw_text(font, al_map_rgb(255, 255, 255), current_w / 2, 120 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, scoreText);
+
+                // Timer
+                float remaining = miniGameTimeLimit - miniGameTimer;
+                sprintf(scoreText, "Czas: %.2f s", remaining);
+                al_draw_text(font, remaining < 2.0f ? al_map_rgb(255, 100, 100) : al_map_rgb(255, 255, 255),
+                    current_w / 2, 160 * scale_y, ALLEGRO_ALIGN_CENTRE, scoreText);
+
+                // Litera
+                if (letterShown) {
+                    char letterStr[2] = { targetLetter, '\0' };
+                    al_draw_text(titleFont, al_map_rgb(255, 255, 0), current_w / 2, 350 * scale_y,
+                        ALLEGRO_ALIGN_CENTRE, letterStr);
+
+                    al_draw_text(font, al_map_rgb(200, 200, 200), current_w / 2, 500 * scale_y,
+                        ALLEGRO_ALIGN_CENTRE, "Nacisnij odpowiednia litere!");
+                }
             }
 
             al_flip_display();
