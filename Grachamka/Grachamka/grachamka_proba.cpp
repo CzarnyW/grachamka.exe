@@ -1600,6 +1600,10 @@ int main() {
     char targetLetter = 'A';
     bool letterShown = false;
 
+    //komunikat o zapisie
+    bool savePointsMessage = false;
+    float saveMessageTimer = 0;
+
     // Komunikat o braku punktów
     bool showNoPointsMessage = false;
     float noPointsMessageTimer = 0;
@@ -1989,12 +1993,25 @@ int main() {
                 }
                 else if (isMouseOverButton(saveBtn, mouseX, mouseY)) {
                     saveGame(player);
+                        saveMessageTimer += 1.0 / 60.0;
+                        if (saveMessageTimer > 2.0)
+                        {
+                            savePointsMessage = false;
+                            saveMessageTimer = 0;
+                        }
+
                 }
                 else if (isMouseOverButton(manageBtn, mouseX, mouseY)) {
                     state = ZARZAD;
                 }
                 else if (isMouseOverButton(exitBtn, mouseX, mouseY)) {
                         running = false;
+                }
+
+                if (saveMessageTimer > 2.0)
+                {
+                    al_draw_text(titleFont, al_map_rgb(255, 100, 100), current_w / 2, current_h / 2,
+                        ALLEGRO_ALIGN_CENTRE, "ZAPISANO W SLOCIE:" "!!");
                 }
             }
             // ARENA TRENINGOWA - wybór minigry
@@ -2985,3 +3002,4 @@ int main() {
 
     return 0;
 }
+//linijka 2013 - dokończyć 
