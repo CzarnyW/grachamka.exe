@@ -18,9 +18,13 @@
 #include <allegro5/allegro_ttf.h>  
 #include <allegro5/allegro_image.h>
 #include <atomic>
-
+bool showDeleteMessage = false;
+float deleteMessageTimer = 0;
+int deletedSlotNumber = 0;  
+int slot;
+bool showSaveMessage = false;
+float saveMessageTimer = 0;
 using namespace std;
-
 const int SCREEN_W = 1500;
 const int SCREEN_H = 1000;
 
@@ -271,9 +275,11 @@ void saveGame(const Player& player) {
     file << player.arenaLevel << "\n";
 
     file.close();
-    cout << "\nGra zapisana w gniazdu " << player.saveSlot << "!\n";
 }
 
+vector<Equipment> initWeapons();
+vector<Equipment> initArmors();
+vector<Equipment> initShields();
 
 bool loadGame(Player& player) {
     string filename = getSaveFileName(player.saveSlot);
@@ -290,22 +296,26 @@ bool loadGame(Player& player) {
     file >> save.strengthMult >> save.defenseMult >> save.healthMult >> save.magicMult;
     file >> save.maxHp >> save.currentHp >> save.energy >> save.maxEnergy;
 
-    file.ignore();
+    file.ignore(); // Usuń \n po maxEnergy
     getline(file, save.weaponName);
     file >> save.weaponLevel >> save.weaponPrice;
 
-    file.ignore();
+    file.ignore(); // Usuń \n po weaponPrice
     getline(file, save.armorName);
     file >> save.armorLevel >> save.armorPrice;
 
-    file.ignore();
+    file.ignore(); // Usuń \n po armorPrice
     getline(file, save.shieldName);
     file >> save.shieldLevel >> save.shieldPrice;
 
+    file.ignore(); // ⭐ TO BRAKUJE! Usuń \n po shieldPrice
     file >> save.skillPoints >> save.wins >> save.losses >> save.arenaLevel;
 
     file.close();
-
+    vector<Equipment> weapons = initWeapons();
+    vector<Equipment> armors = initArmors();
+    vector<Equipment> shields = initShields();
+    // Przypisanie do gracza
     player.name = save.playerName;
     player.level = save.level;
     player.exp = save.exp;
@@ -329,23 +339,22 @@ bool loadGame(Player& player) {
     player.arenaLevel = save.arenaLevel;
 
     if (!save.weaponName.empty() && save.weaponName != "BRAK") {
-        player.weapon.name = save.weaponName;
-        player.weapon.level = save.weaponLevel;
-        player.weapon.price = save.weaponPrice;
+        if (save.weaponLevel >= 0 && save.weaponLevel < (int)weapons.size()) {
+            player.weapon = weapons[save.weaponLevel]; // Przypisz CAŁY obiekt
+        }
     }
 
     if (!save.armorName.empty() && save.armorName != "BRAK") {
-        player.armor.name = save.armorName;
-        player.armor.level = save.armorLevel;
-        player.armor.price = save.armorPrice;
+        if (save.armorLevel >= 0 && save.armorLevel < (int)armors.size()) {
+            player.armor = armors[save.armorLevel]; // Przypisz CAŁY obiekt
+        }
     }
 
     if (!save.shieldName.empty() && save.shieldName != "BRAK") {
-        player.shield.name = save.shieldName;
-        player.shield.level = save.shieldLevel;
-        player.shield.price = save.shieldPrice;
+        if (save.shieldLevel >= 0 && save.shieldLevel < (int)shields.size()) {
+            player.shield = shields[save.shieldLevel]; // Przypisz CAŁY obiekt
+        }
     }
-
     return true;
 }
 
@@ -353,9 +362,6 @@ void deleteSave(int slot) {
     string filename = getSaveFileName(slot);
     if (remove(filename.c_str()) == 0) {
         cout << "\nZapis z gniazda " << slot << " zostal usuniety!\n";
-    }
-    else {
-        cout << "\nBlad: Nie mozna usunac zapisu!\n";
     }
 }
 
@@ -1432,6 +1438,7 @@ void generateNewLetter(char& letter, int stage, float& timeLimit) {
     timeLimit = (5.0f * 5.0f) / stage;
 }
 
+
 int main() {
     srand(static_cast<unsigned int>(time(0)));
 
@@ -1623,6 +1630,22 @@ int main() {
 
         if (event.type == ALLEGRO_EVENT_TIMER) {
             redraw = true;
+
+            if (showSaveMessage) {
+                saveMessageTimer += 1.0 / 60.0;
+                if (saveMessageTimer > 2.0) {
+                    showSaveMessage = false;
+                    saveMessageTimer = 0;
+                }
+            }
+
+            if (showDeleteMessage) {
+                deleteMessageTimer += 1.0 / 60.0;
+                if (deleteMessageTimer > 2.0) {
+                    showDeleteMessage = false;
+                    deleteMessageTimer = 0;
+                }
+            }
 
             // Timer dla komunikatu o braku punktów (2 sekundy)
             if (showNoPointsMessage) {
@@ -1993,26 +2016,16 @@ int main() {
                 }
                 else if (isMouseOverButton(saveBtn, mouseX, mouseY)) {
                     saveGame(player);
-                        saveMessageTimer += 1.0 / 60.0;
-                        if (saveMessageTimer > 2.0)
-                        {
-                            savePointsMessage = false;
-                            saveMessageTimer = 0;
-                        }
-
+                    showSaveMessage = true;
+                    saveMessageTimer = 0;
                 }
                 else if (isMouseOverButton(manageBtn, mouseX, mouseY)) {
                     state = ZARZAD;
                 }
                 else if (isMouseOverButton(exitBtn, mouseX, mouseY)) {
-                        running = false;
+                    running = false;
                 }
 
-                if (saveMessageTimer > 2.0)
-                {
-                    al_draw_text(titleFont, al_map_rgb(255, 100, 100), current_w / 2, current_h / 2,
-                        ALLEGRO_ALIGN_CENTRE, "ZAPISANO W SLOCIE:" "!!");
-                }
             }
             // ARENA TRENINGOWA - wybór minigry
             else if (state == ARENA_TRENINGOWA) {
@@ -2342,6 +2355,9 @@ int main() {
                     if (isMouseOverButton(deleteBtn, mouseX, mouseY)) {
                         if (saveGameExists(i)) {
                             deleteSave(i);
+                            showDeleteMessage = true;
+                            deleteMessageTimer = 0;
+                            deletedSlotNumber = i;
                         }
                     }
                 }
@@ -2436,6 +2452,8 @@ int main() {
                     al_draw_text(smallFont, al_map_rgb(100, 255, 100), current_w / 2, 720 * scale_y,
                         ALLEGRO_ALIGN_CENTRE, "Nacisnij ENTER aby rozpoczac gre");
                 }
+
+            
             }
             // TRAINING - stan wyboru zapisu do wczytania
             else if (state == TRAINING) {
@@ -2541,7 +2559,12 @@ int main() {
                 drawButton(saveBtn, font);
                 drawButton(manageBtn, smallFont);
                 drawButton(exitBtn, smallFont);
-
+                if (showSaveMessage) {
+                    char saveText[64];
+                    sprintf(saveText, "ZAPISANO W SLOCIE: %d !!", player.saveSlot);
+                    al_draw_text(titleFont, al_map_rgb(255, 200, 200), current_w / 2, current_h / 2,
+                        ALLEGRO_ALIGN_CENTRE, saveText);
+                }
                 al_draw_text(smallFont, al_map_rgb(150, 150, 150), current_w / 2, current_h - 50 * scale_y,
                     ALLEGRO_ALIGN_CENTRE, "F11 - Tryb pelnoekranowy");
             }
@@ -2667,37 +2690,37 @@ int main() {
                 if (nextWeaponLvl < (int)weapons.size()) {
                     sprintf(equipText, "Bron: %s (+%d DMG) - %d zlota",
                         weapons[nextWeaponLvl].name.c_str(), weapons[nextWeaponLvl].value, weapons[nextWeaponLvl].price);
-                    al_draw_text(smallFont, al_map_rgb(200, 200, 200), 100 * scale_x, 520 * scale_y, 0, equipText);
+                    al_draw_text(smallFont, al_map_rgb(200, 200, 200), 50 * scale_x, 520 * scale_y, 0, equipText);
                 }
                 else {
-                    al_draw_text(smallFont, al_map_rgb(150, 150, 150), 100 * scale_x, 520 * scale_y, 0, "Bron: MAX");
+                    al_draw_text(smallFont, al_map_rgb(150, 150, 150), 50 * scale_x, 520 * scale_y, 0, "Bron: MAX");
                 }
 
                 int nextArmorLvl = player.armor.level + 1;
                 if (nextArmorLvl < (int)armors.size()) {
                     sprintf(equipText, "Zbroja: %s (+%d DEF) - %d zlota",
                         armors[nextArmorLvl].name.c_str(), armors[nextArmorLvl].defenseValue, armors[nextArmorLvl].price);
-                    al_draw_text(smallFont, al_map_rgb(200, 200, 200), 350 * scale_x, 520 * scale_y, 0, equipText);
+                    al_draw_text(smallFont, al_map_rgb(200, 200, 200), 600 * scale_x, 520 * scale_y, 0, equipText);
                 }
                 else {
-                    al_draw_text(smallFont, al_map_rgb(150, 150, 150), 350 * scale_x, 520 * scale_y, 0, "Zbroja: MAX");
+                    al_draw_text(smallFont, al_map_rgb(150, 150, 150), 600 * scale_x, 520 * scale_y, 0, "Zbroja: MAX");
                 }
 
                 int nextShieldLvl = player.shield.level + 1;
                 if (nextShieldLvl < (int)shields.size()) {
                     sprintf(equipText, "Tarcza: %s (+%d DEF) - %d zlota",
                         shields[nextShieldLvl].name.c_str(), shields[nextShieldLvl].defenseValue, shields[nextShieldLvl].price);
-                    al_draw_text(smallFont, al_map_rgb(200, 200, 200), 600 * scale_x, 520 * scale_y, 0, equipText);
+                    al_draw_text(smallFont, al_map_rgb(200, 200, 200), 1150 * scale_x, 520 * scale_y, 0, equipText);
                 }
                 else {
-                    al_draw_text(smallFont, al_map_rgb(150, 150, 150), 600 * scale_x, 520 * scale_y, 0, "Tarcza: MAX");
+                    al_draw_text(smallFont, al_map_rgb(150, 150, 150), 1150 * scale_x, 520 * scale_y, 0, "Tarcza: MAX");
                 }
 
                 Button buyWeaponBtn = createButton(100 * scale_x, 700 * scale_y, 200 * scale_x, 50 * scale_y,
                     "KUP BRON", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
-                Button buyArmorBtn = createButton(350 * scale_x, 700 * scale_y, 200 * scale_x, 50 * scale_y,
+                Button buyArmorBtn = createButton(650 * scale_x, 700 * scale_y, 200 * scale_x, 50 * scale_y,
                     "KUP ZBROJE", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
-                Button buyShieldBtn = createButton(600 * scale_x, 700 * scale_y, 200 * scale_x, 50 * scale_y,
+                Button buyShieldBtn = createButton(1200 * scale_x, 700 * scale_y, 200 * scale_x, 50 * scale_y,
                     "KUP TARCZE", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
                 Button backBtn = createButton(current_w / 2 - 100 * scale_x, 800 * scale_y, 200 * scale_x, 50 * scale_y,
                     "POWROT", al_map_rgb(100, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 130));
@@ -2841,6 +2864,12 @@ int main() {
                     "POWROT", al_map_rgb(100, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 130));
                 backBtn.isHovered = isMouseOverButton(backBtn, mouseX, mouseY);
                 drawButton(backBtn, font);
+                if (showDeleteMessage) {
+                    char deleteText[64];
+                    sprintf(deleteText, "USUNIETO ZAPIS Z GNIAZDA: %d !!", deletedSlotNumber);
+                    al_draw_text(titleFont, al_map_rgb(255, 100, 100), current_w / 2, current_h / 2,
+                        ALLEGRO_ALIGN_CENTRE, deleteText);
+                }
             }
 
             // ARENA TRENINGOWA - menu wyboru
