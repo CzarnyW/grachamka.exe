@@ -20,7 +20,7 @@
 #include <atomic>
 bool showDeleteMessage = false;
 float deleteMessageTimer = 0;
-int deletedSlotNumber = 0;  
+int deletedSlotNumber = 0;
 int slot;
 bool showSaveMessage = false;
 float saveMessageTimer = 0;
@@ -944,36 +944,36 @@ void combat(Player& player, Enemy& enemy) {
 
 void arenaMenu(Player& player) {
     vector<Enemy> enemies = {
-        {"Treningowy Manekn", 50, 50, 5, 2, 20, 10, 1, true},
-        {"Poczatkujacy Wojownik", 80, 80, 8, 4, 35, 20, 2, true},
-        {"Wykwalifikowany Wojownik", 120, 120, 12, 6, 55, 35, 3, true},
-        {"Weteran Areny", 180, 180, 18, 9, 80, 55, 5, true},
-        {"Elitarny Czempion", 250, 250, 25, 12, 120, 80, 7, true},
-        {"Mistrz Areny", 350, 350, 35, 16, 180, 120, 10, true},
-        {"Smok Rycerz", 500, 500, 45, 20, 250, 180, 13, true},
-        {"Cieniowy Zabojca", 400, 400, 60, 15, 300, 220, 15, true},
-        {"Wladca Demonow", 700, 700, 70, 25, 400, 300, 18, true},
-        {"Smierc Wcielona", 1000, 1000, 90, 30, 600, 500, 20, true},
-        {"Nieumarły Arcymag", 600, 600, 50, 35, 320, 280, 12, true},
-        {"Bestia Mroku", 800, 800, 75, 28, 450, 350, 16, true},
-        {"Krol Podziemi", 900, 900, 85, 32, 500, 400, 17, true},
-        {"Tytanicka Bestia", 1100, 1100, 100, 38, 700, 600, 22, true},
-        {"Szal Szamana", 650, 650, 55, 30, 350, 250, 14, true},
-        {"Lodowy Byt", 720, 720, 65, 35, 400, 320, 15, true},
-        {"Zakonnica Cieni", 500, 500, 70, 20, 300, 200, 13, true},
-        {"Wojownik Oblakow", 550, 550, 48, 25, 280, 240, 12, true},
-        {"Alchemik Zla", 480, 480, 60, 18, 260, 180, 11, true},
-        {"Strażnik Bram", 850, 850, 80, 40, 550, 450, 19, true},
-        {"Smok Czerni", 950, 950, 92, 42, 650, 500, 21, true},
-        {"Anioł Zagłady", 1000, 1000, 88, 45, 700, 550, 23, true},
-        {"Wampir Wielowiekowy", 700, 700, 68, 38, 400, 380, 18, true},
-        {"Wilkolak Alfa", 620, 620, 72, 26, 350, 280, 16, true},
-        {"Meduza Okrutna", 580, 580, 58, 22, 310, 220, 14, true},
-        {"Lich Niesmiertelny", 880, 880, 78, 48, 600, 500, 22, true},
-        {"Bestia Behemota", 1200, 1200, 110, 50, 800, 700, 25, true},
-        {"Władca Czasu", 950, 950, 95, 52, 750, 600, 24, true},
-        {"Destroyer Wszechświata", 1300, 1300, 120, 55, 900, 800, 26, true},
-        {"Nieznany Byt z Mroku", 1500, 1500, 150, 60, 1200, 1000, 30, true}
+        {"Treningowy Manekn", 50, 500, 5, 2, 20, 10, 1, true},
+        {"Poczatkujacy Wojownik", 800, 80, 8, 4, 35, 20, 2, true},
+        {"Wykwalifikowany Wojownik", 120, 1200, 12, 6, 55, 35, 3, true},
+        {"Weteran Areny", 180, 1800, 18, 9, 80, 55, 5, true},
+        {"Elitarny Czempion", 2500, 250, 25, 12, 120, 80, 7, true},
+        {"Mistrz Areny", 350, 3500, 35, 16, 180, 120, 10, true},
+        {"Smok Rycerz", 500, 5000, 45, 20, 250, 180, 13, true},
+        {"Cieniowy Zabojca", 400, 4000, 60, 15, 300, 220, 15, true},
+        {"Wladca Demonow", 700, 7000, 70, 25, 400, 300, 18, true},
+        {"Smierc Wcielona", 1000, 10000, 90, 30, 600, 500, 20, true},
+        {"Nieumarły Arcymag", 600, 6000, 50, 35, 320, 280, 12, true},
+        {"Bestia Mroku", 800, 8000, 75, 28, 450, 350, 16, true},
+        {"Krol Podziemi", 900, 9000, 85, 32, 500, 400, 17, true},
+        {"Tytanicka Bestia", 1100, 11000, 100, 38, 700, 600, 22, true},
+        {"Szal Szamana", 650, 6500, 55, 30, 350, 250, 14, true},
+        {"Lodowy Byt", 720, 7200, 65, 35, 400, 320, 15, true},
+        {"Zakonnica Cieni", 5000, 500, 70, 20, 300, 200, 13, true},
+        {"Wojownik Oblakow", 5500, 550, 48, 25, 280, 240, 12, true},
+        {"Alchemik Zla", 480, 4800, 60, 18, 260, 180, 11, true},
+        {"Strażnik Bram", 850, 8500, 80, 40, 550, 450, 19, true},
+        {"Smok Czerni", 950, 9500, 92, 42, 650, 500, 21, true},
+        {"Anioł Zagłady", 1000, 10000, 88, 45, 700, 550, 23, true},
+        {"Wampir Wielowiekowy", 7000, 700, 68, 38, 400, 380, 18, true},
+        {"Wilkolak Alfa", 620, 6200, 72, 26, 350, 280, 16, true},
+        {"Meduza Okrutna", 580, 5800, 58, 22, 310, 220, 14, true},
+        {"Lich Niesmiertelny", 880, 8800, 78, 48, 600, 500, 22, true},
+        {"Bestia Behemota", 1200, 12000, 110, 50, 800, 700, 25, true},
+        {"Władca Czasu", 950, 9500, 95, 52, 750, 600, 24, true},
+        {"Destroyer Wszechświata", 1300, 13000, 120, 55, 900, 800, 26, true},
+        {"Nieznany Byt z Mroku", 1500, 15000, 150, 60, 1200, 1000, 30, true}
     };
 
     while (true) {
@@ -1532,36 +1532,36 @@ int main() {
 
     // Lista przeciwników
     vector<Enemy> enemies = {
-        {"Treningowy Manekn", 50, 50, 5, 2, 20, 10, 1, true},
-        {"Poczatkujacy Wojownik", 80, 80, 8, 4, 35, 20, 2, true},
-        {"Wykwalifikowany Wojownik", 120, 120, 12, 6, 55, 35, 3, true},
-        {"Weteran Areny", 180, 180, 18, 9, 80, 55, 5, true},
-        {"Elitarny Czempion", 250, 250, 25, 12, 120, 80, 7, true},
-        {"Mistrz Areny", 350, 350, 35, 16, 180, 120, 10, true},
-        {"Smok Rycerz", 500, 500, 45, 20, 250, 180, 13, true},
-        {"Cieniowy Zabojca", 400, 400, 60, 15, 300, 220, 15, true},
-        {"Wladca Demonow", 700, 700, 70, 25, 400, 300, 18, true},
-        {"Smierc Wcielona", 1000, 1000, 90, 30, 600, 500, 20, true},
-        {"Nieumarły Arcymag", 600, 600, 50, 35, 320, 280, 12, true},
-        {"Bestia Mroku", 800, 800, 75, 28, 450, 350, 16, true},
-        {"Krol Podziemi", 900, 900, 85, 32, 500, 400, 17, true},
-        {"Tytanicka Bestia", 1100, 1100, 100, 38, 700, 600, 22, true},
-        {"Szal Szamana", 650, 650, 55, 30, 350, 250, 14, true},
-        {"Lodowy Byt", 720, 720, 65, 35, 400, 320, 15, true},
-        {"Zakonnica Cieni", 500, 500, 70, 20, 300, 200, 13, true},
-        {"Wojownik Oblakow", 550, 550, 48, 25, 280, 240, 12, true},
-        {"Alchemik Zla", 480, 480, 60, 18, 260, 180, 11, true},
-        {"Strażnik Bram", 850, 850, 80, 40, 550, 450, 19, true},
-        {"Smok Czerni", 950, 950, 92, 42, 650, 500, 21, true},
-        {"Anioł Zagłady", 1000, 1000, 88, 45, 700, 550, 23, true},
-        {"Wampir Wielowiekowy", 700, 700, 68, 38, 400, 380, 18, true},
-        {"Wilkolak Alfa", 620, 620, 72, 26, 350, 280, 16, true},
-        {"Meduza Okrutna", 580, 580, 58, 22, 310, 220, 14, true},
-        {"Lich Niesmiertelny", 880, 880, 78, 48, 600, 500, 22, true},
-        {"Bestia Behemota", 1200, 1200, 110, 50, 800, 700, 25, true},
-        {"Władca Czasu", 950, 950, 95, 52, 750, 600, 24, true},
-        {"Destroyer Wszechświata", 1300, 1300, 120, 55, 900, 800, 26, true},
-        {"Nieznany Byt z Mroku", 1500, 1500, 150, 60, 1200, 1000, 30, true}
+        {"Treningowy Manekn", 50, 500, 5, 2, 20, 10, 1, true},
+        {"Poczatkujacy Wojownik", 800, 80, 8, 4, 35, 20, 2, true},
+        {"Wykwalifikowany Wojownik", 120, 1200, 12, 6, 55, 35, 3, true},
+        {"Weteran Areny", 180, 1800, 18, 9, 80, 55, 5, true},
+        {"Elitarny Czempion", 2500, 250, 25, 12, 120, 80, 7, true},
+        {"Mistrz Areny", 350, 3500, 35, 16, 180, 120, 10, true},
+        {"Smok Rycerz", 500, 5000, 45, 20, 250, 180, 13, true},
+        {"Cieniowy Zabojca", 400, 4000, 60, 15, 300, 220, 15, true},
+        {"Wladca Demonow", 700, 7000, 70, 25, 400, 300, 18, true},
+        {"Smierc Wcielona", 1000, 10000, 90, 30, 600, 500, 20, true},
+        {"Nieumarły Arcymag", 600, 6000, 50, 35, 320, 280, 12, true},
+        {"Bestia Mroku", 800, 8000, 75, 28, 450, 350, 16, true},
+        {"Krol Podziemi", 900, 9000, 85, 32, 500, 400, 17, true},
+        {"Tytanicka Bestia", 1100, 11000, 100, 38, 700, 600, 22, true},
+        {"Szal Szamana", 650, 6500, 55, 30, 350, 250, 14, true},
+        {"Lodowy Byt", 720, 7200, 65, 35, 400, 320, 15, true},
+        {"Zakonnica Cieni", 5000, 500, 70, 20, 300, 200, 13, true},
+        {"Wojownik Oblakow", 5500, 550, 48, 25, 280, 240, 12, true},
+        {"Alchemik Zla", 480, 4800, 60, 18, 260, 180, 11, true},
+        {"Strażnik Bram", 850, 8500, 80, 40, 550, 450, 19, true},
+        {"Smok Czerni", 950, 9500, 92, 42, 650, 500, 21, true},
+        {"Anioł Zagłady", 1000, 10000, 88, 45, 700, 550, 23, true},
+        {"Wampir Wielowiekowy", 7000, 700, 68, 38, 400, 380, 18, true},
+        {"Wilkolak Alfa", 620, 6200, 72, 26, 350, 280, 16, true},
+        {"Meduza Okrutna", 580, 5800, 58, 22, 310, 220, 14, true},
+        {"Lich Niesmiertelny", 880, 8800, 78, 48, 600, 500, 22, true},
+        {"Bestia Behemota", 1200, 12000, 110, 50, 800, 700, 25, true},
+        {"Władca Czasu", 950, 9500, 95, 52, 750, 600, 24, true},
+        {"Destroyer Wszechświata", 1300, 13000, 120, 55, 900, 800, 26, true},
+        {"Nieznany Byt z Mroku", 1500, 15000, 150, 60, 1200, 1000, 30, true}
     };
 
     GameState state = TITLE_SCREEN;
@@ -2135,12 +2135,28 @@ int main() {
                         al_map_rgb(150, 50, 50), al_map_rgb(255, 255, 255), al_map_rgb(200, 70, 70));
 
                     if (isMouseOverButton(enemyBtn, mouseX, mouseY)) {
-                        selectedEnemy = i;
-                        enemies[i].hp = enemies[i].maxHp;
-                        player.currentHp = player.maxHp;
-                        combo = 0;
-                        state = FIGHT;
-                        break;
+                        // ⭐ SPRAWDŹ CZY PRZECIWNIK JEST ODBLOKOWANY
+                        if (player.level >= enemies[i].level) {
+                            selectedEnemy = i;
+
+                            // ⭐ SKALOWANIE TRUDNOŚCI: f(x) = 3x²
+                            int levelDiff = player.level - enemies[i].level;
+                            int hpBonus = 3 * levelDiff * levelDiff;  // 3x²
+                            int dmgBonus = (3 * levelDiff * levelDiff) / 10;  // 0.3x²
+
+                            enemies[i].hp = enemies[i].maxHp + hpBonus;
+                            enemies[i].maxHp = enemies[i].hp;
+                            enemies[i].damage += dmgBonus;
+
+                            player.currentHp = player.maxHp;
+                            combo = 0;
+                            state = FIGHT;
+                            break;
+                        }
+                        else {
+                            // ⭐ OPCJONALNIE: Można dodać dźwięk lub efekt "zablokowane"
+                            // Na razie nic się nie dzieje przy kliknięciu zablokowanego
+                        }
                     }
                 }
 
@@ -2149,7 +2165,7 @@ int main() {
                 if (isMouseOverButton(backBtn, mouseX, mouseY)) {
                     state = MENU;
                 }
-            }
+                }
             // WALKA
             else if (state == FIGHT && selectedEnemy >= 0) {
                 Button attackBtn = createButton(100 * scale_x, 700 * scale_y, 200 * scale_x, 60 * scale_y,
@@ -2244,9 +2260,9 @@ int main() {
             else if (state == SHOP) {
                 Button buyWeaponBtn = createButton(100 * scale_x, 700 * scale_y, 200 * scale_x, 50 * scale_y,
                     "KUP BRON", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
-                Button buyArmorBtn = createButton(350 * scale_x, 700 * scale_y, 200 * scale_x, 50 * scale_y,
+                Button buyArmorBtn = createButton(650 * scale_x, 700 * scale_y, 200 * scale_x, 50 * scale_y,
                     "KUP ZBROJE", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
-                Button buyShieldBtn = createButton(600 * scale_x, 700 * scale_y, 200 * scale_x, 50 * scale_y,
+                Button buyShieldBtn = createButton(1200 * scale_x, 700 * scale_y, 200 * scale_x, 50 * scale_y,
                     "KUP TARCZE", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
                 Button backBtn = createButton(current_w / 2 - 100 * scale_x, 800 * scale_y, 200 * scale_x, 50 * scale_y,
                     "POWROT", al_map_rgb(100, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 130));
@@ -2453,7 +2469,7 @@ int main() {
                         ALLEGRO_ALIGN_CENTRE, "Nacisnij ENTER aby rozpoczac gre");
                 }
 
-            
+
             }
             // TRAINING - stan wyboru zapisu do wczytania
             else if (state == TRAINING) {
