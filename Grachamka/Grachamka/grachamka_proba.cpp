@@ -1705,19 +1705,37 @@ int main() {
             if (state == MINIGRA_SILA && strengthButtonActive) {
                 miniGameTimer += 1.0 / 60.0;
                 if (miniGameTimer >= miniGameTimeLimit) {
-                    // Czas minął, koniec gry
+                    // ⭐ ZAPISZ WYNIKI
+                    lastMinigameResult.minigameName = "TRENING SILY";
+                    lastMinigameResult.scoreAchieved = miniGameScore;
+                    lastMinigameResult.statGained = miniGameScore;
+                    lastMinigameResult.statName = "Sila";
+                    lastMinigameResult.expGained = miniGameScore * 2;
+                    lastMinigameResult.levelBefore = player.level;
+
                     player.stats.strength += miniGameScore;
                     gainExp(player, miniGameScore * 2);
-                    state = ARENA_TRENINGOWA;
+
+                    lastMinigameResult.levelAfter = player.level;
+                    state = MINIGAME_RESULTS;
                 }
             }
             else if (state == MINIGRA_MAGIA) {
                 miniGameTimer += 1.0 / 60.0;
                 if (miniGameTimer >= miniGameTimeLimit) {
-                    // Czas minął, koniec gry
+                    // ⭐ ZAPISZ WYNIKI
+                    lastMinigameResult.minigameName = "TRENING MAGII";
+                    lastMinigameResult.scoreAchieved = miniGameScore;
+                    lastMinigameResult.statGained = miniGameScore;
+                    lastMinigameResult.statName = "Magia";
+                    lastMinigameResult.expGained = miniGameScore * 2;
+                    lastMinigameResult.levelBefore = player.level;
+
                     player.stats.magic += miniGameScore;
                     gainExp(player, miniGameScore * 2);
-                    state = ARENA_TRENINGOWA;
+
+                    lastMinigameResult.levelAfter = player.level;
+                    state = MINIGAME_RESULTS;
                 }
             }
             else if (state == MINIGRA_AGILITY) {
@@ -1759,10 +1777,19 @@ int main() {
                                 ball.active = false;
                             }
                             else {
-                                // Koniec gry
+                                // ⭐ ZAPISZ WYNIKI
+                                lastMinigameResult.minigameName = "TRENING ZRECZNOSCI";
+                                lastMinigameResult.scoreAchieved = miniGameScore;
+                                lastMinigameResult.statGained = miniGameScore;
+                                lastMinigameResult.statName = "Zrecznosc";
+                                lastMinigameResult.expGained = miniGameScore * 2;
+                                lastMinigameResult.levelBefore = player.level;
+
                                 player.stats.agility += miniGameScore;
                                 gainExp(player, miniGameScore * 2);
-                                state = ARENA_TRENINGOWA;
+
+                                lastMinigameResult.levelAfter = player.level;
+                                state = MINIGAME_RESULTS;
                                 balls.clear();
                             }
                         }
@@ -1780,12 +1807,21 @@ int main() {
             else if (state == MINIGRA_WITALNOSC && letterShown) {
                 miniGameTimer += 1.0 / 60.0;
                 if (miniGameTimer >= miniGameTimeLimit) {
-                    // Czas minął, koniec gry
+                    // ⭐ ZAPISZ WYNIKI
+                    lastMinigameResult.minigameName = "TRENING WITALNOSCI";
+                    lastMinigameResult.scoreAchieved = miniGameScore;
+                    lastMinigameResult.statGained = miniGameScore;
+                    lastMinigameResult.statName = "Witalnosc";
+                    lastMinigameResult.expGained = miniGameScore * 2;
+                    lastMinigameResult.levelBefore = player.level;
+
                     player.stats.vitality += miniGameScore;
                     gainExp(player, miniGameScore * 2);
                     player.maxHp = calculateMaxHp(player);
                     player.currentHp = player.maxHp;
-                    state = ARENA_TRENINGOWA;
+
+                    lastMinigameResult.levelAfter = player.level;
+                    state = MINIGAME_RESULTS;
                 }
             }
         }
@@ -1835,12 +1871,21 @@ int main() {
                         miniGameTimer = 0;
                     }
                     else {
-                        // Źle, koniec gry
+                        // ⭐ ZAPISZ WYNIKI
+                        lastMinigameResult.minigameName = "TRENING WITALNOSCI";
+                        lastMinigameResult.scoreAchieved = miniGameScore;
+                        lastMinigameResult.statGained = miniGameScore;
+                        lastMinigameResult.statName = "Witalnosc";
+                        lastMinigameResult.expGained = miniGameScore * 2;
+                        lastMinigameResult.levelBefore = player.level;
+
                         player.stats.vitality += miniGameScore;
                         gainExp(player, miniGameScore * 2);
                         player.maxHp = calculateMaxHp(player);
                         player.currentHp = player.maxHp;
-                        state = ARENA_TRENINGOWA;
+
+                        lastMinigameResult.levelAfter = player.level;
+                        state = MINIGAME_RESULTS;
                     }
                 }
             }
@@ -1923,10 +1968,19 @@ int main() {
                                 miniGameTimer = 0;
                             }
                             else {
-                                // Źle, koniec gry
+                                // ⭐ ZAPISZ WYNIKI
+                                lastMinigameResult.minigameName = "TRENING MAGII";
+                                lastMinigameResult.scoreAchieved = miniGameScore;
+                                lastMinigameResult.statGained = miniGameScore;
+                                lastMinigameResult.statName = "Magia";
+                                lastMinigameResult.expGained = miniGameScore * 2;
+                                lastMinigameResult.levelBefore = player.level;
+
                                 player.stats.magic += miniGameScore;
                                 gainExp(player, miniGameScore * 2);
-                                state = ARENA_TRENINGOWA;
+
+                                lastMinigameResult.levelAfter = player.level;
+                                state = MINIGAME_RESULTS;
                             }
                         }
                         catch (...) {
@@ -2132,10 +2186,19 @@ int main() {
                     miniGameTimeLimit = (5.0f * 5.0f) / miniGameStage;
 
                     if (strengthButtonsClicked >= strengthButtonsTotal) {
-                        // Koniec gry - wszystkie przyciski kliknięte
+                        // ⭐ ZAPISZ WYNIKI
+                        lastMinigameResult.minigameName = "TRENING SILY";
+                        lastMinigameResult.scoreAchieved = miniGameScore;
+                        lastMinigameResult.statGained = miniGameScore;
+                        lastMinigameResult.statName = "Sila";
+                        lastMinigameResult.expGained = miniGameScore * 2;
+                        lastMinigameResult.levelBefore = player.level;
+
                         player.stats.strength += miniGameScore;
                         gainExp(player, miniGameScore * 2);
-                        state = ARENA_TRENINGOWA;
+
+                        lastMinigameResult.levelAfter = player.level;
+                        state = MINIGAME_RESULTS;
                     }
                     else {
                         // Nowy przycisk
@@ -2424,6 +2487,13 @@ int main() {
                     "POWROT", al_map_rgb(100, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 130));
                 if (isMouseOverButton(backBtn, mouseX, mouseY)) {
                     state = MENU;
+                }
+            }
+            else if (state == MINIGAME_RESULTS) {
+                Button continueBtn = createButton(current_w / 2 - 150 * scale_x, 700 * scale_y, 300 * scale_x, 60 * scale_y,
+                    "KONTYNUUJ", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
+                if (isMouseOverButton(continueBtn, mouseX, mouseY)) {
+                    state = ARENA_TRENINGOWA;
                 }
             }
         }
@@ -3109,8 +3179,70 @@ int main() {
                         ALLEGRO_ALIGN_CENTRE, "Nacisnij odpowiednia litere!");
                 }
             }
+            else if (state == MINIGAME_RESULTS) {
+                al_clear_to_color(al_map_rgb(30, 40, 60));
 
-            al_flip_display();
+                al_draw_text(titleFont, al_map_rgb(100, 255, 100), current_w / 2, 100 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, "=== WYNIKI TRENINGU ===");
+
+                // Nazwa minigry
+                al_draw_text(titleFont, al_map_rgb(255, 215, 0), current_w / 2, 200 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, lastMinigameResult.minigameName.c_str());
+
+                // Ramka z wynikami
+                al_draw_filled_rectangle(current_w / 2 - 400 * scale_x, 300 * scale_y,
+                    current_w / 2 + 400 * scale_x, 650 * scale_y, al_map_rgb(40, 50, 70));
+                al_draw_rectangle(current_w / 2 - 400 * scale_x, 300 * scale_y,
+                    current_w / 2 + 400 * scale_x, 650 * scale_y, al_map_rgb(100, 200, 255), 3);
+
+                char resultText[256];
+
+                // Zdobyte punkty
+                sprintf(resultText, "Zdobyte punkty: %d", lastMinigameResult.scoreAchieved);
+                al_draw_text(font, al_map_rgb(255, 255, 255), current_w / 2, 340 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, resultText);
+
+                // Przyrost statystyki
+                sprintf(resultText, "%s: +%d", lastMinigameResult.statName.c_str(), lastMinigameResult.statGained);
+                al_draw_text(font, al_map_rgb(100, 255, 100), current_w / 2, 400 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, resultText);
+
+                // Zdobyte EXP
+                sprintf(resultText, "Doswiadczenie: +%d EXP", lastMinigameResult.expGained);
+                al_draw_text(font, al_map_rgb(255, 200, 100), current_w / 2, 460 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, resultText);
+
+                // Poziom przed i po
+                if (lastMinigameResult.levelAfter > lastMinigameResult.levelBefore) {
+                    // AWANS POZIOMU!
+                    sprintf(resultText, "*** AWANS POZIOMU! %d -> %d ***",
+                        lastMinigameResult.levelBefore, lastMinigameResult.levelAfter);
+                    al_draw_text(font, al_map_rgb(255, 255, 0), current_w / 2, 520 * scale_y,
+                        ALLEGRO_ALIGN_CENTRE, resultText);
+
+                    al_draw_text(smallFont, al_map_rgb(200, 200, 255), current_w / 2, 560 * scale_y,
+                        ALLEGRO_ALIGN_CENTRE, "+20 punktow umiejetnosci!");
+                }
+                else {
+                    sprintf(resultText, "Poziom: %d", lastMinigameResult.levelBefore);
+                    al_draw_text(font, al_map_rgb(200, 200, 200), current_w / 2, 520 * scale_y,
+                        ALLEGRO_ALIGN_CENTRE, resultText);
+                }
+
+                // Statystyki gracza
+                sprintf(resultText, "HP: %d/%d | Punkty umiejetnosci: %d",
+                    player.currentHp, player.maxHp, player.skillPoints);
+                al_draw_text(smallFont, al_map_rgb(180, 180, 180), current_w / 2, 600 * scale_y,
+                    ALLEGRO_ALIGN_CENTRE, resultText);
+
+                // Przycisk kontynuuj
+                Button continueBtn = createButton(current_w / 2 - 150 * scale_x, 700 * scale_y, 300 * scale_x, 60 * scale_y,
+                    "KONTYNUUJ", al_map_rgb(50, 150, 50), al_map_rgb(255, 255, 255), al_map_rgb(70, 180, 70));
+                continueBtn.isHovered = isMouseOverButton(continueBtn, mouseX, mouseY);
+                drawButton(continueBtn, font);
+                }
+
+                al_flip_display();
         }
     }
 
