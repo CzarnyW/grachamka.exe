@@ -50,7 +50,8 @@ enum GameState {
     MINIGRA_MAGIA,
     MINIGRA_AGILITY,
     MINIGRA_WITALNOSC,
-    LEVEL_UP_SCREEN
+    LEVEL_UP_SCREEN,
+    MINIGAME_RESULTS
 };
 
 struct Ball {
@@ -159,6 +160,16 @@ struct Explosion {
     int currentFrame;
     ALLEGRO_COLOR color;
     bool active;
+};
+
+struct MinigameResult {
+    string minigameName;
+    int scoreAchieved;
+    int statGained;
+    string statName;
+    int expGained;
+    int levelBefore;
+    int levelAfter;
 };
 
 void clearScreen() {
@@ -875,7 +886,8 @@ void combat(Player& player, Enemy& enemy) {
 
         this_thread::sleep_for(chrono::milliseconds(800));
 
-        int enemyDamage = enemy.damage + rand() % 5;
+        int enemyDamage = enemy.damage + rand() % 40;  // Losowy bonus 0-39
+        enemyDamage = (int)(enemyDamage * 1.3);  // Mnożnik x1.3
         double enemyHitChance = 0.75 - (player.stats.agility * 0.01);
         if (enemyHitChance < 0.3) enemyHitChance = 0.3;
         double roll = static_cast<double>(rand()) / RAND_MAX;
@@ -944,38 +956,50 @@ void combat(Player& player, Enemy& enemy) {
 
 void arenaMenu(Player& player) {
     vector<Enemy> enemies = {
-        {"Treningowy Manekn", 50, 500, 5, 2, 20, 10, 1, true},
-        {"Poczatkujacy Wojownik", 800, 80, 8, 4, 35, 20, 2, true},
-        {"Wykwalifikowany Wojownik", 120, 1200, 12, 6, 55, 35, 3, true},
-        {"Weteran Areny", 180, 1800, 18, 9, 80, 55, 5, true},
-        {"Elitarny Czempion", 2500, 250, 25, 12, 120, 80, 7, true},
-        {"Mistrz Areny", 350, 3500, 35, 16, 180, 120, 10, true},
-        {"Smok Rycerz", 500, 5000, 45, 20, 250, 180, 13, true},
-        {"Cieniowy Zabojca", 400, 4000, 60, 15, 300, 220, 15, true},
-        {"Wladca Demonow", 700, 7000, 70, 25, 400, 300, 18, true},
-        {"Smierc Wcielona", 1000, 10000, 90, 30, 600, 500, 20, true},
-        {"Nieumarły Arcymag", 600, 6000, 50, 35, 320, 280, 12, true},
-        {"Bestia Mroku", 800, 8000, 75, 28, 450, 350, 16, true},
-        {"Krol Podziemi", 900, 9000, 85, 32, 500, 400, 17, true},
-        {"Tytanicka Bestia", 1100, 11000, 100, 38, 700, 600, 22, true},
-        {"Szal Szamana", 650, 6500, 55, 30, 350, 250, 14, true},
-        {"Lodowy Byt", 720, 7200, 65, 35, 400, 320, 15, true},
-        {"Zakonnica Cieni", 5000, 500, 70, 20, 300, 200, 13, true},
-        {"Wojownik Oblakow", 5500, 550, 48, 25, 280, 240, 12, true},
-        {"Alchemik Zla", 480, 4800, 60, 18, 260, 180, 11, true},
-        {"Strażnik Bram", 850, 8500, 80, 40, 550, 450, 19, true},
-        {"Smok Czerni", 950, 9500, 92, 42, 650, 500, 21, true},
-        {"Anioł Zagłady", 1000, 10000, 88, 45, 700, 550, 23, true},
-        {"Wampir Wielowiekowy", 7000, 700, 68, 38, 400, 380, 18, true},
-        {"Wilkolak Alfa", 620, 6200, 72, 26, 350, 280, 16, true},
-        {"Meduza Okrutna", 580, 5800, 58, 22, 310, 220, 14, true},
-        {"Lich Niesmiertelny", 880, 8800, 78, 48, 600, 500, 22, true},
-        {"Bestia Behemota", 1200, 12000, 110, 50, 800, 700, 25, true},
-        {"Władca Czasu", 950, 9500, 95, 52, 750, 600, 24, true},
-        {"Destroyer Wszechświata", 1300, 13000, 120, 55, 900, 800, 26, true},
-        {"Nieznany Byt z Mroku", 1500, 15000, 150, 60, 1200, 1000, 30, true}
-    };
+        // Wzór: HP = 20*lvl² + 50*lvl + 100, DMG = lvl² + 3*lvl + 5
 
+        // Poziom 1-5 (Bardzo łatwy start)
+        {"Treningowy Manekn", 170, 170, 9, 5, 20, 10, 1, true},               // HP: 170, DMG: 9
+        {"Poczatkujacy Wojownik", 280, 280, 15, 8, 35, 20, 2, true},          // HP: 280, DMG: 15
+        {"Mlody Rycerz", 430, 430, 23, 12, 50, 30, 3, true},                  // HP: 430, DMG: 23
+        {"Lasowiec", 620, 620, 33, 16, 65, 40, 4, true},                      // HP: 620, DMG: 33
+        {"Zbir z Karczmy", 850, 850, 45, 20, 80, 50, 5, true},                // HP: 850, DMG: 45
+
+        // Poziom 6-10
+        {"Weteran Miejski", 1120, 1120, 59, 25, 100, 65, 6, true},            // HP: 1,120, DMG: 59
+        {"Elitarny Straznik", 1430, 1430, 75, 30, 120, 80, 7, true},          // HP: 1,430, DMG: 75
+        {"Szermierz Krolewski", 1780, 1780, 93, 35, 140, 95, 8, true},        // HP: 1,780, DMG: 93
+        {"Lowca Nagrod", 2170, 2170, 113, 40, 160, 110, 9, true},             // HP: 2,170, DMG: 113
+        {"Mistrz Areny", 2600, 2600, 135, 45, 180, 125, 10, true},            // HP: 2,600, DMG: 135
+
+        // Poziom 11-15
+        {"Alchemik Zla", 3070, 3070, 159, 50, 210, 145, 11, true},            // HP: 3,070, DMG: 159
+        {"Nieumarły Arcymag", 3580, 3580, 185, 55, 240, 165, 12, true},       // HP: 3,580, DMG: 185
+        {"Smok Rycerz", 4130, 4130, 213, 60, 270, 185, 13, true},             // HP: 4,130, DMG: 213
+        {"Szal Szamana", 4720, 4720, 243, 65, 300, 205, 14, true},            // HP: 4,720, DMG: 243
+        {"Cieniowy Zabojca", 5350, 5350, 275, 70, 330, 225, 15, true},        // HP: 5,350, DMG: 275
+
+        // Poziom 16-20
+        {"Bestia Mroku", 6020, 6020, 309, 75, 370, 250, 16, true},            // HP: 6,020, DMG: 309
+        {"Krol Podziemi", 6730, 6730, 345, 80, 410, 275, 17, true},           // HP: 6,730, DMG: 345
+        {"Wampir Wielowiekowy", 7480, 7480, 383, 85, 450, 300, 18, true},     // HP: 7,480, DMG: 383
+        {"Strażnik Bram", 8270, 8270, 423, 90, 490, 325, 19, true},           // HP: 8,270, DMG: 423
+        {"Smierc Wcielona", 9100, 9100, 465, 95, 530, 350, 20, true},         // HP: 9,100, DMG: 465
+
+        // Poziom 21-25
+        {"Smok Czerni", 9970, 9970, 509, 100, 580, 380, 21, true},            // HP: 9,970, DMG: 509
+        {"Tytanicka Bestia", 10880, 10880, 555, 105, 630, 410, 22, true},     // HP: 10,880, DMG: 555
+        {"Anioł Zagłady", 11830, 11830, 603, 110, 680, 440, 23, true},        // HP: 11,830, DMG: 603
+        {"Władca Czasu", 12820, 12820, 653, 115, 730, 470, 24, true},         // HP: 12,820, DMG: 653
+        {"Bestia Behemota", 13850, 13850, 705, 120, 780, 500, 25, true},      // HP: 13,850, DMG: 705
+
+        // Poziom 26-30
+        {"Destroyer Wszechświata", 14920, 14920, 759, 125, 840, 535, 26, true},   // HP: 14,920, DMG: 759
+        {"Lodowy Feniks", 16030, 16030, 815, 130, 900, 570, 27, true},            // HP: 16,030, DMG: 815
+        {"Wladca Demonow", 17180, 17180, 873, 135, 960, 605, 28, true},           // HP: 17,180, DMG: 873
+        {"Pierwotny Chaos", 18370, 18370, 933, 140, 1020, 640, 29, true},         // HP: 18,370, DMG: 933
+        {"Nieznany Byt z Mroku", 19600, 19600, 995, 150, 1100, 700, 30, true}     // HP: 19,600, DMG: 995
+    };
     while (true) {
         clearScreen();
         displayHeader("ARENA WALKI - PRZYGODA");
@@ -1532,36 +1556,49 @@ int main() {
 
     // Lista przeciwników
     vector<Enemy> enemies = {
-        {"Treningowy Manekn", 50, 500, 5, 2, 20, 10, 1, true},
-        {"Poczatkujacy Wojownik", 800, 80, 8, 4, 35, 20, 2, true},
-        {"Wykwalifikowany Wojownik", 120, 1200, 12, 6, 55, 35, 3, true},
-        {"Weteran Areny", 180, 1800, 18, 9, 80, 55, 5, true},
-        {"Elitarny Czempion", 2500, 250, 25, 12, 120, 80, 7, true},
-        {"Mistrz Areny", 350, 3500, 35, 16, 180, 120, 10, true},
-        {"Smok Rycerz", 500, 5000, 45, 20, 250, 180, 13, true},
-        {"Cieniowy Zabojca", 400, 4000, 60, 15, 300, 220, 15, true},
-        {"Wladca Demonow", 700, 7000, 70, 25, 400, 300, 18, true},
-        {"Smierc Wcielona", 1000, 10000, 90, 30, 600, 500, 20, true},
-        {"Nieumarły Arcymag", 600, 6000, 50, 35, 320, 280, 12, true},
-        {"Bestia Mroku", 800, 8000, 75, 28, 450, 350, 16, true},
-        {"Krol Podziemi", 900, 9000, 85, 32, 500, 400, 17, true},
-        {"Tytanicka Bestia", 1100, 11000, 100, 38, 700, 600, 22, true},
-        {"Szal Szamana", 650, 6500, 55, 30, 350, 250, 14, true},
-        {"Lodowy Byt", 720, 7200, 65, 35, 400, 320, 15, true},
-        {"Zakonnica Cieni", 5000, 500, 70, 20, 300, 200, 13, true},
-        {"Wojownik Oblakow", 5500, 550, 48, 25, 280, 240, 12, true},
-        {"Alchemik Zla", 480, 4800, 60, 18, 260, 180, 11, true},
-        {"Strażnik Bram", 850, 8500, 80, 40, 550, 450, 19, true},
-        {"Smok Czerni", 950, 9500, 92, 42, 650, 500, 21, true},
-        {"Anioł Zagłady", 1000, 10000, 88, 45, 700, 550, 23, true},
-        {"Wampir Wielowiekowy", 7000, 700, 68, 38, 400, 380, 18, true},
-        {"Wilkolak Alfa", 620, 6200, 72, 26, 350, 280, 16, true},
-        {"Meduza Okrutna", 580, 5800, 58, 22, 310, 220, 14, true},
-        {"Lich Niesmiertelny", 880, 8800, 78, 48, 600, 500, 22, true},
-        {"Bestia Behemota", 1200, 12000, 110, 50, 800, 700, 25, true},
-        {"Władca Czasu", 950, 9500, 95, 52, 750, 600, 24, true},
-        {"Destroyer Wszechświata", 1300, 13000, 120, 55, 900, 800, 26, true},
-        {"Nieznany Byt z Mroku", 1500, 15000, 150, 60, 1200, 1000, 30, true}
+        // Wzór: HP = 20*lvl² + 50*lvl + 100, DMG = lvl² + 3*lvl + 5
+
+        // Poziom 1-5 (Bardzo łatwy start)
+        {"Treningowy Manekn", 170, 170, 9, 5, 20, 10, 1, true},               // HP: 170, DMG: 9
+        {"Poczatkujacy Wojownik", 280, 280, 15, 8, 35, 20, 2, true},          // HP: 280, DMG: 15
+        {"Mlody Rycerz", 430, 430, 23, 12, 50, 30, 3, true},                  // HP: 430, DMG: 23
+        {"Lasowiec", 620, 620, 33, 16, 65, 40, 4, true},                      // HP: 620, DMG: 33
+        {"Zbir z Karczmy", 850, 850, 45, 20, 80, 50, 5, true},                // HP: 850, DMG: 45
+
+        // Poziom 6-10
+        {"Weteran Miejski", 1120, 1120, 59, 25, 100, 65, 6, true},            // HP: 1,120, DMG: 59
+        {"Elitarny Straznik", 1430, 1430, 75, 30, 120, 80, 7, true},          // HP: 1,430, DMG: 75
+        {"Szermierz Krolewski", 1780, 1780, 93, 35, 140, 95, 8, true},        // HP: 1,780, DMG: 93
+        {"Lowca Nagrod", 2170, 2170, 113, 40, 160, 110, 9, true},             // HP: 2,170, DMG: 113
+        {"Mistrz Areny", 2600, 2600, 135, 45, 180, 125, 10, true},            // HP: 2,600, DMG: 135
+
+        // Poziom 11-15
+        {"Alchemik Zla", 3070, 3070, 159, 50, 210, 145, 11, true},            // HP: 3,070, DMG: 159
+        {"Nieumarły Arcymag", 3580, 3580, 185, 55, 240, 165, 12, true},       // HP: 3,580, DMG: 185
+        {"Smok Rycerz", 4130, 4130, 213, 60, 270, 185, 13, true},             // HP: 4,130, DMG: 213
+        {"Szal Szamana", 4720, 4720, 243, 65, 300, 205, 14, true},            // HP: 4,720, DMG: 243
+        {"Cieniowy Zabojca", 5350, 5350, 275, 70, 330, 225, 15, true},        // HP: 5,350, DMG: 275
+
+        // Poziom 16-20
+        {"Bestia Mroku", 6020, 6020, 309, 75, 370, 250, 16, true},            // HP: 6,020, DMG: 309
+        {"Krol Podziemi", 6730, 6730, 345, 80, 410, 275, 17, true},           // HP: 6,730, DMG: 345
+        {"Wampir Wielowiekowy", 7480, 7480, 383, 85, 450, 300, 18, true},     // HP: 7,480, DMG: 383
+        {"Strażnik Bram", 8270, 8270, 423, 90, 490, 325, 19, true},           // HP: 8,270, DMG: 423
+        {"Smierc Wcielona", 9100, 9100, 465, 95, 530, 350, 20, true},         // HP: 9,100, DMG: 465
+
+        // Poziom 21-25
+        {"Smok Czerni", 9970, 9970, 509, 100, 580, 380, 21, true},            // HP: 9,970, DMG: 509
+        {"Tytanicka Bestia", 10880, 10880, 555, 105, 630, 410, 22, true},     // HP: 10,880, DMG: 555
+        {"Anioł Zagłady", 11830, 11830, 603, 110, 680, 440, 23, true},        // HP: 11,830, DMG: 603
+        {"Władca Czasu", 12820, 12820, 653, 115, 730, 470, 24, true},         // HP: 12,820, DMG: 653
+        {"Bestia Behemota", 13850, 13850, 705, 120, 780, 500, 25, true},      // HP: 13,850, DMG: 705
+
+        // Poziom 26-30
+        {"Destroyer Wszechświata", 14920, 14920, 759, 125, 840, 535, 26, true},   // HP: 14,920, DMG: 759
+        {"Lodowy Feniks", 16030, 16030, 815, 130, 900, 570, 27, true},            // HP: 16,030, DMG: 815
+        {"Wladca Demonow", 17180, 17180, 873, 135, 960, 605, 28, true},           // HP: 17,180, DMG: 873
+        {"Pierwotny Chaos", 18370, 18370, 933, 140, 1020, 640, 29, true},         // HP: 18,370, DMG: 933
+        {"Nieznany Byt z Mroku", 19600, 19600, 995, 150, 1100, 700, 30, true}     // HP: 19,600, DMG: 995
     };
 
     GameState state = TITLE_SCREEN;
@@ -1573,6 +1610,7 @@ int main() {
     bool inputActive = false;
     int selectedSaveSlot = 0;
     int previousLevel = player.level;
+    MinigameResult lastMinigameResult;
 
     // Zmienne dla minigier
     float miniGameTimer = 0;
@@ -2116,7 +2154,7 @@ int main() {
                     mathInputActive = true;
                 }
             }
-            // ARENA - wybor przeciwnika
+           // ARENA - wybor przeciwnika
             else if (state == ARENA) {
                 float btnW = 220 * scale_x;
                 float btnH = 50 * scale_y;
@@ -2135,14 +2173,17 @@ int main() {
                         al_map_rgb(150, 50, 50), al_map_rgb(255, 255, 255), al_map_rgb(200, 70, 70));
 
                     if (isMouseOverButton(enemyBtn, mouseX, mouseY)) {
-                        // ⭐ SPRAWDŹ CZY PRZECIWNIK JEST ODBLOKOWANY
                         if (player.level >= enemies[i].level) {
                             selectedEnemy = i;
 
-                            // ⭐ SKALOWANIE TRUDNOŚCI: f(x) = 3x²
+                            // ⭐ PARABOLICZNE SKALOWANIE
                             int levelDiff = player.level - enemies[i].level;
-                            int hpBonus = 3 * levelDiff * levelDiff;  // 3x²
-                            int dmgBonus = (3 * levelDiff * levelDiff) / 10;  // 0.3x²
+
+                            // HP bonus: 8x²
+                            int hpBonus = 8 * levelDiff * levelDiff;
+
+                            // DMG bonus: 3x²
+                            int dmgBonus = 3 * levelDiff * levelDiff;
 
                             enemies[i].hp = enemies[i].maxHp + hpBonus;
                             enemies[i].maxHp = enemies[i].hp;
@@ -2222,7 +2263,8 @@ int main() {
 
                     // Atak wroga
                     if (enemy.hp > 0) {
-                        int enemyDamage = enemy.damage + rand() % 5;
+                        int enemyDamage = enemy.damage + rand() % 40;  // Losowy bonus 0-39
+                        enemyDamage = (int)(enemyDamage * 1.3);  // Mnożnik x1.3
                         double enemyHitChance = 0.75 - (player.stats.agility * 0.01);
                         if (enemyHitChance < 0.3) enemyHitChance = 0.3;
                         double roll = (double)rand() / RAND_MAX;
@@ -2608,31 +2650,65 @@ int main() {
                     float x = startX + col * (btnW + gapX);
                     float y = startY + row * (btnH + gapY);
 
+                    // ⭐ SPRAWDŹ CZY PRZECIWNIK JEST ODBLOKOWANY
+                    bool isUnlocked = (player.level >= enemies[i].level);
+
+                    // ⭐ KOLORY: zielony dla odblokowanych, szary dla zablokowanych
+                    ALLEGRO_COLOR btnColor = isUnlocked ? al_map_rgb(150, 50, 50) : al_map_rgb(60, 60, 60);
+                    ALLEGRO_COLOR hoverColor = isUnlocked ? al_map_rgb(200, 70, 70) : al_map_rgb(80, 80, 80);
+                    ALLEGRO_COLOR textColor = isUnlocked ? al_map_rgb(255, 255, 255) : al_map_rgb(120, 120, 120);
+
                     Button enemyBtn = createButton(x, y, btnW, btnH, "",
-                        al_map_rgb(150, 50, 50), al_map_rgb(255, 255, 255), al_map_rgb(200, 70, 70));
-                    enemyBtn.isHovered = isMouseOverButton(enemyBtn, mouseX, mouseY);
+                        btnColor, al_map_rgb(255, 255, 255), hoverColor);
+                    enemyBtn.isHovered = isMouseOverButton(enemyBtn, mouseX, mouseY) && isUnlocked;
                     drawButton(enemyBtn, smallFont);
 
+                    // ⭐ NAZWA PRZECIWNIKA
                     char text[128];
                     sprintf(text, "%d. %s", i + 1, enemies[i].name.c_str());
-                    al_draw_text(smallFont, al_map_rgb(255, 255, 255), x + btnW / 2, y + 5 * scale_y,
+                    al_draw_text(smallFont, textColor, x + btnW / 2, y + 5 * scale_y,
                         ALLEGRO_ALIGN_CENTRE, text);
-                    sprintf(text, "Lvl %d | HP: %d", enemies[i].level, enemies[i].maxHp);
-                    al_draw_text(smallFont, al_map_rgb(200, 200, 200), x + btnW / 2, y + 28 * scale_y,
-                        ALLEGRO_ALIGN_CENTRE, text);
+
+                    // ⭐ INFORMACJE: HP dla odblokowanych, "ZABLOKOWANY" dla zablokowanych
+                    if (isUnlocked) {
+                        // Oblicz skalowane statystyki do wyświetlenia
+                        int levelDiff = player.level - enemies[i].level;
+                        int hpBonus = 3 * levelDiff * levelDiff;
+                        int scaledHP = enemies[i].maxHp + hpBonus;
+
+                        sprintf(text, "Lvl %d | HP: %d", enemies[i].level, scaledHP);
+                        al_draw_text(smallFont, al_map_rgb(200, 200, 200),
+                            x + btnW / 2, y + 28 * scale_y, ALLEGRO_ALIGN_CENTRE, text);
+                    }
+                    else {
+                        sprintf(text, "🔒 Wymagany Lvl %d", enemies[i].level);
+                        al_draw_text(smallFont, al_map_rgb(255, 100, 100),
+                            x + btnW / 2, y + 28 * scale_y, ALLEGRO_ALIGN_CENTRE, text);
+                    }
                 }
 
                 Button backBtn = createButton(current_w / 2 - 100 * scale_x, 850 * scale_y, 200 * scale_x, 50 * scale_y,
                     "POWROT", al_map_rgb(100, 100, 100), al_map_rgb(255, 255, 255), al_map_rgb(130, 130, 130));
                 backBtn.isHovered = isMouseOverButton(backBtn, mouseX, mouseY);
                 drawButton(backBtn, font);
-            }
+                }
             // WALKA
             else if (state == FIGHT && selectedEnemy >= 0) {
                 Enemy& enemy = enemies[selectedEnemy];
 
                 al_draw_text(titleFont, al_map_rgb(255, 100, 100), current_w / 2, 30 * scale_y,
+
                     ALLEGRO_ALIGN_CENTRE, "WALKA!");
+                int levelDiff = player.level - enemy.level;
+                if (levelDiff > 0) {
+                    char bonusText[64];
+                    sprintf(bonusText, "Bonus trudności: +%d HP, +%d DMG",
+                        3 * levelDiff * levelDiff,
+                        (3 * levelDiff * levelDiff) / 10);
+                    al_draw_text(smallFont, al_map_rgb(255, 200, 100), current_w / 2, 80 * scale_y,
+                        ALLEGRO_ALIGN_CENTRE, bonusText);
+                }
+
 
                 // Rysuj postać (zielony kwadrat)
                 drawPlayer(200 * scale_x, 300 * scale_y, 150 * scale_x);
@@ -3047,4 +3123,3 @@ int main() {
 
     return 0;
 }
-//linijka 2013 - dokończyć 
